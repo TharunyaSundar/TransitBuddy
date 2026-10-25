@@ -5,7 +5,7 @@ student leaves at 10:15. Each window says where it came from so replies can be h
 """
 from dataclasses import asdict, dataclass, field
 
-from .schedule import classes_on
+from .schedule import classes_on, is_online
 from .timeutil import display, from_minutes, parse_window, to_minutes
 
 ARRIVAL_BUFFER_MIN = 10  # arrive this long before the first class
@@ -97,3 +97,35 @@ def _window_text(window: str) -> str:
     """'08:00-08:30' -> '8:00-8:30 AM' style for replies."""
     w = parse_window(window)
     return f"{display(from_minutes(w[0]))}-{display(from_minutes(w[1]))}" if w else window
+
+
+MIN_GAP_MIN = 15  # shorter breaks are just walking between rooms
+
+
+def free_time(schedule: dict | None, day: str) -> dict:
+    """Free time between classes on `day`, for errands or a break: each gap, and the part of it that is usable
+    if the student must be back ARRIVAL_BUFFER_MIN early for an on-campus class (not for an online one).
+    Online classes with meeting times still take up time. Overlapping classes are merged."""
+    meetings = []
+    for c in (schedule or {}).get("courses", []):
+        online = is_online(c.get("location", ""))
+        for p in c.get("meeting_patterns", []):
+            if p["day_of_week"] == day:
+                meetings.append({"course": c["course_code"], "start": to_minutes(p["start_time"]),
+                                 "end": to_minutes(p["end_time"]), "online": online})
+    meetings.sort(key=lambda m: (m["start"], m["end"]))
+    classes = [f"{m['course']} {display(from_minutes(m['start']))}-{display(from_minutes(m['end']))}"
+               + (" (online)" if m["online"] else "") for m in meetings]
+    gaps, busy_until, after = [], None, None
+    for m in meetings:
+        if busy_until is not None and m["start"] - busy_until >= MIN_GAP_MIN:
+            back_by = m["start"] - (0 if m["online"] else ARRIVAL_BUFFER_MIN)
+            gaps.append({"from": display(from_minutes(busy_until)), "to": display(from_minutes(m["start"])),
+                         "minutes": m["start"] - busy_until, "after": after, "before": m["course"],
+                         "backBy": display(from_minutes(back_by)), "usableMinutes": max(0, back_by - busy_until)})
+        if busy_until is None or m["end"] > busy_until:
+            busy_until, after = m["end"], m["course"]
+    out = {"day": day, "classes": classes, "gaps": gaps}
+    if meetings:
+        out["classesOverAt"] = display(from_minutes(busy_until))
+    return out

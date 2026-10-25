@@ -194,6 +194,32 @@ class NextClass(unittest.TestCase):
         self.assertIn("Call the tool again for every question about times", prompt)
 
 
+class FreeTimeTool(unittest.TestCase):
+    def ask(self, args, user="1001", now=MONDAY_7AM):
+        model = ScriptedModel(script=[[("get_free_time", args)], "ok"], seen=[])
+        svc = AgentService(demo_database(), model=model, clock=lambda: now)
+        resp = run(svc.process_message(ctx("On Tuesday, when can I run errands between my classes?", user=user)))
+        return resp, json.loads(tool_results(model)[0])
+
+    def test_errands_question_uses_the_availability_skill_and_tool(self):
+        resp, r = self.ask({"day": "Tuesday"})
+        self.assertIn("availability", resp.metadata["skills_used"])
+        self.assertEqual(resp.metadata["tools_called"], ["get_free_time"])
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["day"], "Tuesday")
+        self.assertIn("MAT 265", " ".join(r["classes"]))
+
+    def test_next_day_and_no_schedule(self):
+        _, r = self.ask({}, now=MONDAY_7AM - timedelta(hours=19))  # Sunday: defaults to Monday
+        self.assertEqual((r["day"], r["nextClass"]), ("Monday", "tomorrow, October 26"))
+        _, r = self.ask({"day": "Tuesday"}, user="9999")
+        self.assertEqual((r["ok"], r["code"]), (False, "no_schedule"))
+
+    def test_free_time_is_in_the_prompt_rules(self):
+        from src.agent.prompts.system_prompt import build_system_prompt
+        self.assertIn("get_free_time", build_system_prompt(MONDAY_7AM, "", None, {}))
+
+
 class ConstraintParsing(unittest.TestCase):
     NAMES = {"1001": "you", "1002": "Priya", "1003": "Jordan Lee"}
 

@@ -1,7 +1,7 @@
 import unittest
 
 from src.agent.dev_database import DEMO_GUILD, demo_database
-from src.agent.logic.availability import day_availability, departure_window
+from src.agent.logic.availability import day_availability, departure_window, free_time
 from src.agent.logic.matching import find_matches, same_area
 from src.agent.logic.negotiation import negotiate
 from src.agent.logic.schedule import (classes_on, format_schedule, is_valid_course, missing_for_save,
@@ -130,6 +130,42 @@ class Availability(unittest.TestCase):
         s = get(self.db, "get_student_schedule", DEMO_GUILD, "1001")
         s["confirmation_status"] = "pending_confirmation"
         self.assertIn("schedule not confirmed yet", day_availability("1001", s, None, "Monday").notes)
+
+
+def _course(code, location, *meetings):
+    return {"course_code": code, "location": location,
+            "meeting_patterns": [{"day_of_week": d, "start_time": a, "end_time": b} for d, a, b in meetings]}
+
+
+class FreeTime(unittest.TestCase):
+    # Tuesday like the screenshot: two ENG 102 sections back to back, then a short CSE 110 lab (room TBA)
+    SCHED = {"courses": [_course("ENG 102", "Tempe - COOR 4403", ("Tuesday", "10:00", "10:50")),
+                         _course("ENG 102", "Tempe - COOR 4403", ("Tuesday", "11:00", "11:50")),
+                         _course("CSE 110", "TBA", ("Tuesday", "14:00", "14:15"), ("Thursday", "13:00", "14:15"))]}
+
+    def test_gap_and_when_to_be_back(self):
+        r = free_time(self.SCHED, "Tuesday")
+        self.assertEqual(r["classes"], ["ENG 102 10:00 AM-10:50 AM", "ENG 102 11:00 AM-11:50 AM",
+                                        "CSE 110 2:00 PM-2:15 PM"])
+        self.assertEqual(r["gaps"], [{"from": "11:50 AM", "to": "2:00 PM", "minutes": 130, "after": "ENG 102",
+                                      "before": "CSE 110", "backBy": "1:50 PM", "usableMinutes": 120}])
+        self.assertEqual(r["classesOverAt"], "2:15 PM")  # the 10-minute break is too short to list
+
+    def test_online_class_takes_time_but_needs_no_trip_back(self):
+        sched = {"courses": [_course("CSE 110", "Tempe - ISTB4 101", ("Monday", "09:00", "09:50")),
+                             _course("HST 100", "Online", ("Monday", "12:00", "13:15")),
+                             _course("MAT 265", "Tempe - COOR 170", ("Monday", "15:00", "15:50"))]}
+        gaps = free_time(sched, "Monday")["gaps"]
+        self.assertEqual([(g["from"], g["to"], g["backBy"]) for g in gaps],
+                         [("9:50 AM", "12:00 PM", "12:00 PM"), ("1:15 PM", "3:00 PM", "2:50 PM")])
+
+    def test_overlaps_merge_and_empty_days(self):
+        sched = {"courses": [_course("A 100", "X", ("Monday", "09:00", "11:00")),
+                             _course("B 100", "X", ("Monday", "10:00", "10:30")),
+                             _course("C 100", "X", ("Monday", "12:00", "12:50"))]}
+        self.assertEqual([(g["from"], g["after"]) for g in free_time(sched, "Monday")["gaps"]], [("11:00 AM", "A 100")])
+        self.assertEqual(free_time(sched, "Sunday"), {"day": "Sunday", "classes": [], "gaps": []})
+        self.assertEqual(free_time(None, "Monday")["gaps"], [])
 
 
 class Matching(unittest.TestCase):

@@ -15,7 +15,7 @@ from langchain.tools import ToolRuntime, tool
 from pydantic import BaseModel, Field
 
 from .. import db as dbcall
-from ..logic.availability import day_availability, departure_window
+from ..logic.availability import MIN_GAP_MIN, day_availability, departure_window, free_time
 from ..logic.matching import find_matches
 from ..logic.negotiation import negotiate, window_text
 from ..logic.schedule import format_schedule, normalize_schedule
@@ -174,6 +174,28 @@ async def get_availability(runtime: ToolRuntime[AgentContext], day: str = "next"
             entry["usual_departure_window"] = av.preferred_window
         out.append(entry)
     return _out({"ok": True, "day": d, **extra, "people": out})
+
+
+@tool
+@_guarded
+async def get_free_time(runtime: ToolRuntime[AgentContext], day: str = "next") -> str:
+    """The user's free time between classes on a day, for errands, lunch or a break: each gap, when they must
+    be back (10 minutes before an on-campus class) and how many minutes they can use. day: "next" (the day of
+    their next class, the default), "today", "tomorrow", "Monday"... Only report gaps this tool returns."""
+    ctx = runtime.context
+    d, extra = await _day(ctx, day)
+    sched = await dbcall.call(ctx.db, "get_student_schedule", ctx.discord_guild_id, ctx.discord_user_id)
+    if not sched or sched.get("confirmation_status") != "confirmed":
+        return _out({"ok": False, "code": "no_schedule",
+                     "error": "No saved schedule yet: upload it with /schedule upload, or type the classes here."})
+    result = free_time(sched, d)
+    note = (f"Breaks under {MIN_GAP_MIN} minutes are left out. Times come from the saved schedule only; "
+            "travel to an errand isn't included.")
+    if not result["classes"]:
+        note = "No classes that day, so the whole day is free."
+    elif not result["gaps"]:
+        note = f"No breaks of {MIN_GAP_MIN} minutes or more between classes that day."
+    return _out({"ok": True, **extra, **result, "note": note})
 
 
 @tool
@@ -414,5 +436,5 @@ async def update_my_commute_profile(runtime: ToolRuntime[AgentContext], general_
     return _out({"ok": True, "saved": changes})
 
 
-ALL_TOOLS = [get_my_schedule, prepare_schedule_from_text, get_availability, find_commute_partners,
-             propose_group_departure, get_my_commute_profile, update_my_commute_profile]
+ALL_TOOLS = [get_my_schedule, prepare_schedule_from_text, get_availability, get_free_time,
+             find_commute_partners, propose_group_departure, get_my_commute_profile, update_my_commute_profile]
