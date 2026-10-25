@@ -10,7 +10,8 @@ from ...shared.validators import is_non_empty_string, is_valid_time_string, is_v
 from ...shared.validators import is_valid_course as is_valid_course_shared
 from .timeutil import display, normalize_days, normalize_time, to_minutes
 
-ONLINE = re.compile(r"\b(online|remote|zoom|icourse|asu online|sync|tba|tbd)\b", re.I)
+ONLINE = re.compile(r"\b(online|remote|zoom|icourse|asu online|sync)\b", re.I)
+UNKNOWN_ROOM = re.compile(r"\b(tba|tbd)\b", re.I)  # room not assigned yet: still an on-campus class
 COURSE_CODE = re.compile(r"^([A-Za-z]{2,4})\s*-?\s*(\d{3}[A-Za-z]?)\b")
 
 
@@ -95,7 +96,7 @@ def normalize_schedule(raw: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
         if not code:
             warnings.append(f"Course {i}: missing course code.")
         location = str(c.get("location") or "").strip()
-        online = is_online(location)
+        online = is_online(location) or (UNKNOWN_ROOM.search(location) is not None and not c.get("meeting_patterns"))
         patterns = _patterns(c, label, warnings)
         if not patterns and not online:
             warnings.append(f"{label}: no meeting times found.")
@@ -152,7 +153,8 @@ def is_valid_course(c: dict) -> bool:
 
 
 def classes_on(schedule: dict | None, day: str) -> list[dict]:
-    """[{course_code, start_time, end_time, location}] meeting on `day`, sorted, online classes excluded."""
+    """[{course_code, start_time, end_time, location}] meeting on `day`, sorted. Online classes are excluded;
+    a class whose room is TBA still counts (it meets on campus, the room just isn't known)."""
     out = []
     for c in (schedule or {}).get("courses", []):
         if is_online(c.get("location", "")):

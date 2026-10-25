@@ -86,6 +86,15 @@ class Schedule(unittest.TestCase):
         self.assertEqual([(p["day_of_week"], p["start_time"]) for p in lab["meeting_patterns"]],
                          [("Tuesday", "14:00"), ("Thursday", "13:00")])
 
+    def test_room_tba_still_counts_for_commutes(self):
+        sched, warnings = normalize_schedule({"courses": [
+            {"course_code": "CSE 110", "course_name": "Lab", "location": "",
+             "meeting_patterns": [{"days": "Tue", "start_time": "2:00 PM", "end_time": "2:15 PM"}]},
+            {"course_code": "HST 109", "location": "TBA"}]})  # no times, room TBA: nothing to plan, no time warning
+        self.assertEqual(sched["courses"][0]["location"], "TBA")
+        self.assertEqual([c["course_code"] for c in classes_on(sched, "Tuesday")], ["CSE 110"])
+        self.assertFalse(any("HST 109" in w and "time" in w for w in warnings))
+
     def test_classes_on_skips_online(self):
         sched, _ = normalize_schedule({"courses": [
             {"course_code": "A 100", "meeting_patterns": [{"days": "M", "start_time": "10:00", "end_time": "11:00"}],
