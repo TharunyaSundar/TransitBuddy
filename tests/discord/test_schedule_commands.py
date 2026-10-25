@@ -119,6 +119,7 @@ def test_confirm_saves_and_view_shows_it():
     asyncio.run(view.children[0].callback(press))  # Confirm
     edited = press.response.edited[0]
     assert edited["content"].startswith("Saved your schedule. Use /schedule view to see it.")
+    assert "home address (private" in edited["content"] and "ride-sharing" not in edited["content"]
     assert [c.label for c in edited["view"].children] == ["Set up your commute"]  # next step: the setup form
     saved = asyncio.run(db.get_student_schedule(DEMO_GUILD, USER))
     assert saved.confirmation_status == "confirmed" and saved.courses[0].course_code == "CSE 340"

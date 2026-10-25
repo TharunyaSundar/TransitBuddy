@@ -8,7 +8,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from langchain.tools import ToolRuntime, tool
@@ -63,6 +63,29 @@ async def _availability(ctx: AgentContext, user_id: str, day: str):
         sched = None  # unconfirmed schedules are never used for planning
     profile = await _profile(ctx, user_id)
     return day_availability(user_id, sched, profile, day), profile, sched
+
+
+NEXT_DAY_WORDS = ("next", "next class", "my next class", "upcoming")
+
+
+async def _day(ctx: AgentContext, day: str | None) -> tuple[str, dict]:
+    """Weekday for a tool's day argument. "next" = the day of the user's next class that hasn't started yet
+    (today if its first class is still ahead), worked out from their saved schedule, never by the model.
+    Also returns extra fields for the tool result (the date, or why there's no next class)."""
+    now = _now(ctx)
+    if (day or "").strip().lower() not in NEXT_DAY_WORDS:
+        return resolve_day(day, now), {}
+    from ..logic.schedule import classes_on
+    sched = await dbcall.call(ctx.db, "get_student_schedule", ctx.discord_guild_id, ctx.discord_user_id)
+    if sched and sched.get("confirmation_status") == "confirmed":
+        for ahead in range(8):
+            d = now + timedelta(days=ahead)
+            name = resolve_day(d.date().isoformat(), now)
+            starts = [to_minutes(c["start_time"]) for c in classes_on(sched, name)]
+            if starts and (ahead or min(starts) > now.hour * 60 + now.minute):
+                label = "today" if ahead == 0 else "tomorrow" if ahead == 1 else name
+                return name, {"nextClass": f"{label}, {d.strftime('%B')} {d.day}"}
+    return resolve_day("today", now), {"nextClass": "none found: no saved schedule with in-person classes"}
 
 
 async def _profile(ctx: AgentContext, user_id: str) -> dict | None:
@@ -130,11 +153,12 @@ async def prepare_schedule_from_text(classes: list[ClassIn], runtime: ToolRuntim
 
 @tool
 @_guarded
-async def get_availability(runtime: ToolRuntime[AgentContext], day: str = "today") -> str:
+async def get_availability(runtime: ToolRuntime[AgentContext], day: str = "next") -> str:
     """When the user (and anyone they @mentioned) can realistically travel on a day: must be on campus by,
-    classes over at, usual departure window. day: "today", "tomorrow", "Monday"..."""
+    classes over at, usual departure window, and the user's leave-home time. day: "next" (the user's next
+    class, the default; use it for "my next class" or when no day is named), "today", "tomorrow", "Monday"..."""
     ctx = runtime.context
-    d = resolve_day(day, _now(ctx))
+    d, extra = await _day(ctx, day)
     out = []
     for uid in [ctx.discord_user_id, *ctx.mentioned_user_ids]:
         av, prefs, sched = await _availability(ctx, uid, d)
@@ -149,19 +173,20 @@ async def get_availability(runtime: ToolRuntime[AgentContext], day: str = "today
         if av.preferred_window:
             entry["usual_departure_window"] = av.preferred_window
         out.append(entry)
-    return _out({"ok": True, "day": d, "people": out})
+    return _out({"ok": True, "day": d, **extra, "people": out})
 
 
 @tool
 @_guarded
 async def find_commute_partners(runtime: ToolRuntime[AgentContext], day: str = "today",
                                 direction: str = "to_campus", around_time: str | None = None) -> str:
-    """Find opted-in students from the same general area with compatible times.
-    direction: to_campus or from_campus. around_time: e.g. "9:00 AM" if the user named a time."""
+    """Find opted-in students from the same general area with compatible times. day: "today", "next" (the
+    user's next class), "tomorrow", "Monday"... direction: to_campus or from_campus. around_time: e.g.
+    "9:00 AM" if the user named a time."""
     ctx = runtime.context
     if direction not in DIRECTIONS:
         direction = "to_campus"
-    d = resolve_day(day, _now(ctx))
+    d, extra = await _day(ctx, day)
     my_av, my_prefs, _ = await _availability(ctx, ctx.discord_user_id, d)
     if not my_prefs or not my_prefs.get("general_origin_area"):
         return _out({"ok": False, "code": "need_area",
@@ -183,7 +208,7 @@ async def find_commute_partners(runtime: ToolRuntime[AgentContext], day: str = "
     matches = find_matches(my_prefs, my_av, pairs, direction, around)
     for m in matches:
         m["who"] = await _name(ctx, m.pop("discord_user_id"))
-    return _out({"ok": True, "day": d, "direction": direction, "matches": matches[:5],
+    return _out({"ok": True, "day": d, **extra, "direction": direction, "matches": matches[:5],
                  "searchedWholeServer": dbcall.has(ctx.db, "get_opted_in_students"),
                  "note": "Only students who opted in to commute matching are included. Ask before connecting them."})
 
@@ -273,14 +298,15 @@ async def propose_group_departure(runtime: ToolRuntime[AgentContext], day: str =
     ["Priya can't leave before 8:28 AM", "I must leave by 8:20 AM"]. travel_minutes: trip length the group
     gave; leave it empty otherwise (the tool uses trip times from saved home addresses, or a 30-minute
     estimate, and says which). arrive_by: only if the user named a time
-    the group must be on campus (otherwise class times are used). Only report times this tool returns."""
+    the group must be on campus (otherwise class times are used). Only report times this tool returns.
+    day: "today", "next" (the user's next class), "tomorrow", "Monday"..."""
     ctx = runtime.context
     if direction not in DIRECTIONS:
         direction = "to_campus"
     if not ctx.mentioned_user_ids:
         return _out({"ok": False, "code": "need_group",
                      "error": "Ask who is in the group: they can @mention the other students."})
-    d = resolve_day(day, _now(ctx))
+    d, extra = await _day(ctx, day)
     group = [ctx.discord_user_id, *ctx.mentioned_user_ids]
     names = {uid: await _name(ctx, uid) for uid in group}
     travel_source = "given"
@@ -326,7 +352,8 @@ async def propose_group_departure(runtime: ToolRuntime[AgentContext], day: str =
             result[k] = display(result[k])
     result["windows"] = {names[u]: window_text(w[0], w[1]) + (f" ({'; '.join(w[2])})" if w[2] else "")
                          for u, w in windows.items()}
-    result.update(ok=True, day=d, direction=direction, travelMinutesAssumed=travel_minutes, travelSource=travel_source)
+    result.update(ok=True, day=d, **extra, direction=direction, travelMinutesAssumed=travel_minutes,
+                  travelSource=travel_source)
     result["constraintsUsed"] = {names[u]: c for u, c in stated.items()}
     if ignored:
         result["ignoredConstraints"] = ignored

@@ -71,7 +71,7 @@ def match_text(r: dict) -> str:
     lines = [f"**Possible partners going {where} on {r['day']}:**"]
     for m in r["matches"]:
         lines.append(f"- **{m['who']}**: {', '.join(m['reasons'])}")
-    lines.append(f"\nOnly students who opted in to ride-sharing are shown. Ask them before making plans.{scope}")
+    lines.append(f"\nOnly students who opted in to commute matching are shown. Ask them before making plans.{scope}")
     return "\n".join(lines)
 
 

@@ -54,8 +54,9 @@ class ConfirmScheduleView(discord.ui.View):
             return
         self.stop()
         await interaction.response.edit_message(
-            content="Saved your schedule. Use /schedule view to see it.\nNext, set up your commute so I can plan "
-                    "trips: your area, usual departure time, ride-sharing and (optional, private) home address.",
+            content="Saved your schedule. Use /schedule view to see it.\nNext, set up your commute so I can work "
+                    "out your trip times: your home address (private, only used for your own trips) and, if you like, "
+                    "your area, usual departure time and commute matching.",
             view=SetupPromptView(self.agent, self.user_id))
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)

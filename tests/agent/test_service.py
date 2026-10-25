@@ -1,6 +1,7 @@
 import asyncio
 import json
 import unittest
+from datetime import timedelta
 
 from src.agent import AgentService
 from src.agent.dev_database import DEMO_GUILD, demo_database
@@ -145,6 +146,52 @@ class ProcessMessage(unittest.TestCase):
                 raise RuntimeError("boom")
         svc = AgentService(demo_database(), model=Broken(script=[], seen=[]), clock=lambda: MONDAY_7AM)
         self.assertIn("try again", run(svc.process_message(ctx("hi"))).response_text)
+
+
+class NextClass(unittest.TestCase):
+    """day="next": the tools work out the next class that hasn't started, so the model never has to."""
+    def availability(self, now, args, user="1001"):
+        model = ScriptedModel(script=[[("get_availability", args)], "ok"], seen=[])
+        svc = AgentService(demo_database(), model=model, clock=lambda: now)
+        run(svc.process_message(ctx("When do I need to leave for my next class?", user=user)))
+        return json.loads(tool_results(model)[0])
+
+    def test_sunday_evening_means_monday(self):
+        r = self.availability(MONDAY_7AM - timedelta(hours=19), {"day": "next"})  # Sunday 12:00 PM
+        self.assertEqual((r["day"], r["nextClass"]), ("Monday", "tomorrow, October 26"))
+        self.assertEqual(r["people"][0]["onCampusBy"], "8:50 AM")
+
+    def test_before_and_after_todays_first_class(self):
+        self.assertEqual(self.availability(MONDAY_7AM, {"day": "next"})["nextClass"], "today, October 26")
+        r = self.availability(MONDAY_7AM.replace(hour=9, minute=30), {"day": "next"})
+        self.assertEqual((r["day"], r["nextClass"]), ("Tuesday", "tomorrow, October 27"))
+        r = self.availability(MONDAY_7AM + timedelta(days=4, hours=12), {"day": "next"})  # Friday 7 PM
+        self.assertEqual((r["day"], r["nextClass"]), ("Monday", "Monday, November 2"))
+
+    def test_next_is_the_default_and_other_days_still_work(self):
+        sunday = MONDAY_7AM - timedelta(hours=19)
+        self.assertEqual(self.availability(sunday, {})["day"], "Monday")
+        r = self.availability(sunday, {"day": "today"})
+        self.assertEqual((r["day"], r["people"][0]["has_classes"], "nextClass" in r), ("Sunday", False, False))
+        self.assertEqual(self.availability(sunday, {"day": "Wednesday"})["day"], "Wednesday")
+
+    def test_no_schedule_says_so(self):
+        r = self.availability(MONDAY_7AM, {"day": "next"}, user="9999")
+        self.assertTrue(r["nextClass"].startswith("none found"))
+
+    def test_group_tools_accept_next(self):
+        model = ScriptedModel(script=[[("find_commute_partners", {"day": "next"})], "ok"], seen=[])
+        svc = AgentService(demo_database(), model=model, clock=lambda: MONDAY_7AM - timedelta(hours=19))
+        run(svc.process_message(ctx("Anyone heading in for my next class?")))
+        r = json.loads(tool_results(model)[0])
+        self.assertEqual((r["day"], r["nextClass"], [m["who"] for m in r["matches"]]),
+                         ("Monday", "tomorrow, October 26", ["Priya"]))
+
+    def test_prompt_tells_the_model_to_use_next_and_call_again(self):
+        from src.agent.prompts.system_prompt import build_system_prompt
+        prompt = build_system_prompt(MONDAY_7AM, "", None, {})
+        self.assertIn('day="next"', prompt)
+        self.assertIn("Call the tool again for every question about times", prompt)
 
 
 class ConstraintParsing(unittest.TestCase):
