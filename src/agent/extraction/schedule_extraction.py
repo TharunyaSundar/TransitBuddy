@@ -2,13 +2,21 @@
 
 The result is always returned for confirmation; nothing is saved here.
 """
+import asyncio
 import base64
 import json
+import logging
 import re
+import time
+
+import httpx
 
 from langchain_core.messages import HumanMessage
 
+from ..llm import vision_timeout_s
 from ..logic.schedule import normalize_schedule
+
+log = logging.getLogger(__name__)
 
 PROMPT = """Read this class schedule screenshot. Return ONLY JSON, no prose, in this shape:
 {"semester": "Fall 2026 or empty if not shown",
@@ -47,17 +55,34 @@ def _content_text(content) -> str:
     return content or ""
 
 
-async def extract_schedule(model, image_input: bytes | str, mime_type: str) -> dict:
-    """Returns a ScheduleExtractionResult."""
+def _failed(message: str) -> dict:
+    return {"extracted_schedule": {"semester": "", "courses": []}, "validation_warnings": [message],
+            "confirmation_required": True}
+
+
+async def extract_schedule(model, image_input: bytes | str, mime_type: str, timeout: float | None = None) -> dict:
+    """Returns a ScheduleExtractionResult. Gives up after `timeout` seconds instead of waiting forever."""
     msg = HumanMessage(content=[{"type": "text", "text": PROMPT},
                                 {"type": "image_url", "image_url": image_data_url(image_input, mime_type)}])
+    limit = timeout or vision_timeout_s()
+    started = time.monotonic()
     try:
-        reply = await model.ainvoke([msg])
+        reply = await asyncio.wait_for(model.ainvoke([msg]), timeout=limit + 1)  # backstop for the client timeout
+    except (asyncio.TimeoutError, httpx.TimeoutException):
+        log.warning("schedule extraction timed out after %.0fs (model %s)", time.monotonic() - started,
+                    getattr(model, "model", "?"))
+        return _failed(f"Reading the screenshot took too long (over {limit:.0f} seconds). Please try again in a "
+                       "minute, or send a smaller screenshot.")
+    except Exception as e:  # model or connection error: say so, never guess
+        log.warning("schedule extraction failed after %.1fs (model %s): %s: %s", time.monotonic() - started,
+                    getattr(model, "model", "?"), type(e).__name__, e)
+        return _failed(f"I couldn't read that screenshot right now ({type(e).__name__}). Please try again in a "
+                       "minute, or type your classes.")
+    log.info("schedule extraction took %.1fs (model %s)", time.monotonic() - started, getattr(model, "model", "?"))
+    try:
         raw = parse_json(_content_text(reply.content))
-    except Exception as e:  # model error or unreadable output: ask for a clearer image, never guess
-        return {"extracted_schedule": {"semester": "", "courses": []},
-                "validation_warnings": [f"I couldn't read that screenshot ({type(e).__name__}). Please send a "
-                                       "clearer one, or type your classes."],
-                "confirmation_required": True}
+    except Exception as e:  # unreadable output: ask for a clearer image
+        return _failed(f"I couldn't read that screenshot ({type(e).__name__}). Please send a clearer one, or "
+                       "type your classes.")
     schedule, warnings = normalize_schedule(raw)
     return {"extracted_schedule": schedule, "validation_warnings": warnings, "confirmation_required": True}

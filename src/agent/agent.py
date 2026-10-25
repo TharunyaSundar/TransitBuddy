@@ -12,7 +12,9 @@
        Confirm / Edit buttons, then on Confirm:
     await service.save_confirmed_schedule(user_id, guild_id)   # the only path that persists a schedule
 """
+import asyncio
 import logging
+import time
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 
@@ -36,6 +38,7 @@ log = logging.getLogger(__name__)
 HISTORY_MESSAGES = 10  # per user per channel; tool calls are not kept, to save tokens
 MAX_RESPONSE_CHARS = 1900  # Discord's limit is 2000
 FALLBACK = "Sorry, I couldn't work that out right now. Please try again in a minute."
+TURN_TIMEOUT_S = 150  # a whole agent turn (several model calls); each call also has its own limit
 
 
 class AgentService:
@@ -90,10 +93,17 @@ class AgentService:
         msgs = [SystemMessage(system), *self.history[key], HumanMessage(message)]
         tools_called: list[str] = []
         try:
-            out = await self.graph.ainvoke({"messages": msgs}, context=ctx, config={"recursion_limit": 14})
+            started = time.monotonic()
+            out = await asyncio.wait_for(
+                self.graph.ainvoke({"messages": msgs}, context=ctx, config={"recursion_limit": 14}),
+                timeout=TURN_TIMEOUT_S)
+            log.info("agent turn took %.1fs", time.monotonic() - started)
             new = out["messages"][len(msgs):]
             tools_called = [tc["name"] for m in new for tc in (getattr(m, "tool_calls", None) or [])]
             text = _text(out["messages"][-1].content) or FALLBACK
+        except asyncio.TimeoutError:
+            log.warning("agent turn timed out after %ss", TURN_TIMEOUT_S)
+            text = "Sorry, that took too long. Please try again in a minute."
         except Exception:
             log.exception("agent turn failed")
             text = FALLBACK

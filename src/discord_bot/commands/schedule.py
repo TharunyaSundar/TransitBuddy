@@ -103,9 +103,8 @@ def build_schedule_group(get_agent: Callable[[], object]) -> app_commands.Group:
             warnings = [w for w in warnings if not w.startswith("Semester not shown")]
         else:
             warnings = [SEMESTER_HINT if w.startswith("Semester not shown") else w for w in warnings]
-        if not schedule.get("courses"):
-            notes = "\n".join(f"- {w}" for w in warnings)
-            await interaction.followup.send(f"I couldn't find any classes in that image.\n{notes}".strip(),
+        if not schedule.get("courses"):  # the warnings say why: timeout, model error, or no classes in it
+            await interaction.followup.send("\n".join(warnings) or "I couldn't find any classes in that image.",
                                             ephemeral=True)
             return
         view = ConfirmScheduleView(agent, user_id, guild_id, schedule)

@@ -72,8 +72,8 @@ jobs:
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
           MONGODB_DATABASE: ${{ vars.MONGODB_DATABASE || 'transit_buddy' }}
           LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'ollama' }}
-          LLM_MODEL: ${{ vars.LLM_MODEL || 'gemma4:cloud' }}
-          VISION_MODEL: ${{ vars.VISION_MODEL || 'gemma4:cloud' }}
+          LLM_MODEL: ${{ vars.LLM_MODEL || 'gemma4:31b' }}  # direct-API name; ':cloud' names need the local app
+          VISION_MODEL: ${{ vars.VISION_MODEL || 'gemma4:31b' }}  # direct-API name; ':cloud' names need the local app
           LLM_REASONING: ${{ vars.LLM_REASONING || 'low' }}
           OLLAMA_BASE_URL: ${{ vars.OLLAMA_BASE_URL || 'https://ollama.com' }}
           DEFAULT_TIMEZONE: ${{ vars.DEFAULT_TIMEZONE || 'America/Phoenix' }}

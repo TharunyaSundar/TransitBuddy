@@ -176,7 +176,7 @@ def test_unreadable_screenshot_has_no_buttons():
     agent, _ = make_agent(reply="I can't see a schedule here")
     msg = upload(agent).followup.sent[0]
     assert msg["ephemeral"] and msg["view"] is None
-    assert "couldn't find any classes" in msg["content"]
+    assert msg["content"].startswith("I couldn't read that screenshot")
 
 
 def test_semester_option_fills_a_missing_semester():

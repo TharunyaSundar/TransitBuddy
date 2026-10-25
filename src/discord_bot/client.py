@@ -60,8 +60,8 @@ def create_discord_client(
 				mentioned_user_ids=_USER_MENTION.findall(question),
 			))
 			await interaction.followup.send(response.response_text, ephemeral=True)
-		except Exception:
-			log.exception("Discord /ask failed")
+		except Exception as error:
+			log(f"Discord /ask failed: {error}")  # log is a plain function, not a logging.Logger
 			await interaction.followup.send(
 				"Transit Buddy's assistant is unavailable right now. Please try again later.",
 				ephemeral=True,

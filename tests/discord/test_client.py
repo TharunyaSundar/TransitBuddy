@@ -60,3 +60,29 @@ def test_ask_passes_discord_context_to_agent_and_replies_privately():
     assert interaction.response.defer_kwargs == {"ephemeral": True, "thinking": True}
     assert interaction.followup.content == "You have class at 9 AM."
     assert interaction.followup.send_kwargs == {"ephemeral": True}
+
+def test_ask_failure_still_answers():
+    class BrokenAgentService:
+        async def process_message(self, context):
+            raise RuntimeError("model unreachable")
+
+    class FakeResponse:
+        async def defer(self, **kwargs):
+            pass
+
+    class FakeFollowup:
+        async def send(self, content, **kwargs):
+            self.content = content
+
+    interaction = type("Interaction", (), {})()
+    interaction.user = type("User", (), {"id": 123})()
+    interaction.guild_id = 456
+    interaction.channel_id = 789
+    interaction.response = FakeResponse()
+    interaction.followup = FakeFollowup()
+    command = create_discord_client(agent_service=BrokenAgentService()).tree.get_command("ask")
+
+    asyncio.run(command.callback(interaction, "When do I leave?"))
+
+    # before the fix, the error handler itself crashed and Discord stayed on "thinking"
+    assert "unavailable right now" in interaction.followup.content
