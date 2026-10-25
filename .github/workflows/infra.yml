@@ -10,9 +10,9 @@ on:
         options: [plan, apply, destroy]
         default: plan
       git_ref:
-        description: Branch, tag or commit the server should run (apply only)
+        description: Branch, tag or commit the server should run (blank = the commit this run started from)
         type: string
-        default: main
+        default: ""
 
 permissions:
   id-token: write # OIDC to AWS
@@ -59,7 +59,7 @@ jobs:
 
       - name: Terraform plan
         if: inputs.action == 'plan'
-        run: terraform plan -var="git_ref=${{ inputs.git_ref }}"
+        run: terraform plan -var="git_ref=${{ inputs.git_ref || github.sha }}"
 
       # The bot's .env lives in SSM (SecureString), never in Terraform state.
       - name: Store bot .env in SSM
@@ -94,7 +94,7 @@ jobs:
 
       - name: Terraform apply
         if: inputs.action == 'apply'
-        run: terraform apply -auto-approve -var="git_ref=${{ inputs.git_ref }}"
+        run: terraform apply -auto-approve -var="git_ref=${{ inputs.git_ref || github.sha }}"
 
       - name: Terraform destroy
         if: inputs.action == 'destroy'

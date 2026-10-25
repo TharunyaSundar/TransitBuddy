@@ -11,8 +11,8 @@ One `t3.micro` Ubuntu instance runs the bot under systemd. Nothing deploys on pu
 3. The workflow file must be on `main` (workflow_dispatch and the AWS role are limited to `main`).
 
 ## Use
-- **apply**: stores the `.env` in SSM (SecureString), then builds the instance. `git_ref` picks the branch/tag/commit to run;
-  changing it replaces the instance (= redeploy).
+- **apply**: stores the `.env` in SSM (SecureString), then builds the instance. `git_ref` picks the branch/tag/commit to run; blank means the commit the run
+  started from, so every `apply` after a code change replaces the instance (= redeploy, a few minutes of downtime).
 - **destroy**: removes the instance, role, security group and the SSM parameter.
 - **Shell / logs**: `aws ssm start-session --target <instance_id>` then `sudo journalctl -u transitbuddy -f`
   (no SSH, no inbound ports). Bootstrap log: `/var/log/transitbuddy-bootstrap.log`.
