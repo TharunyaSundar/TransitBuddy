@@ -1,0 +1,19 @@
+{
+  "name": "transit-buddy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "test": "node --test",
+    "register-commands": "node scripts/registerDiscordCommands.js",
+    "seed": "node scripts/seedDemoData.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "langchain": "^1.5.19",
+    "mongoose": "^8.8.1"
+  }
+}
