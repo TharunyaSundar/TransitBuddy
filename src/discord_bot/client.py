@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 
 from src.config import settings
+from src.discord_bot.commands.schedule import build_schedule_group
 from src.utils.logger import log
 
 
@@ -11,6 +12,8 @@ def create_discord_client(*, register_commands_only: bool = False) -> commands.B
 	intents = discord.Intents.default()
 	intents.guild_messages = True
 	bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents)
+	bot.agent = None  # AgentService, created in setup_hook once MongoDB is connected
+	bot.tree.add_command(build_schedule_group(lambda: bot.agent))
 
 	@bot.tree.command(name="ping", description="Check whether Transit Buddy is online.")
 	async def ping(interaction: discord.Interaction) -> None:
@@ -18,9 +21,11 @@ def create_discord_client(*, register_commands_only: bool = False) -> commands.B
 
 	@bot.tree.command(name="status", description="Show the current Transit Buddy bot status.")
 	async def status(interaction: discord.Interaction) -> None:
-		await interaction.response.send_message(
-			"Transit Buddy is online. Schedule and commute features are not connected yet."
-		)
+		if bot.agent is None:
+			text = "Transit Buddy is online. Schedule features are not connected (database unavailable)."
+		else:
+			text = "Transit Buddy is online. Use /schedule upload and /schedule view for your class schedule."
+		await interaction.response.send_message(text)
 
 	async def sync_guild_commands() -> None:
 		if not settings.discord_guild_id:
@@ -32,7 +37,26 @@ def create_discord_client(*, register_commands_only: bool = False) -> commands.B
 		await bot.tree.sync(guild=guild)
 		log("Discord slash commands registered successfully.")
 
-	bot.setup_hook = sync_guild_commands
+	async def setup_agent() -> None:
+		if not settings.mongodb_uri:
+			log("MONGODB_URI missing; schedule commands will report that they are unavailable.")
+			return
+		try:
+			from src.agent import AgentService
+			from src.database import DatabaseService, connect_database
+
+			await connect_database()
+			bot.agent = AgentService(DatabaseService())
+			log("Agent connected to MongoDB.")
+		except Exception as error:
+			log(f"Agent setup failed: {error}")
+
+	async def setup_hook() -> None:
+		if not register_commands_only:
+			await setup_agent()
+		await sync_guild_commands()
+
+	bot.setup_hook = setup_hook
 
 	@bot.event
 	async def on_ready() -> None:

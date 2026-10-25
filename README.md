@@ -32,6 +32,7 @@ Transit Buddy combines a Discord interface, a MongoDB-backed data layer, and a L
 - Environment configuration handling
 - Documentation for responsibilities and integration contracts
 - Python Discord client with `/ping`, `/status`, and mention responses
+- `/schedule upload` (review a screenshot privately, then Confirm or Cancel) and `/schedule view`
 - Guild slash-command registration script
 
 ## Technology Stack
@@ -130,7 +131,7 @@ pytest
 
 ## Discord Setup
 
-Create a Discord application, configure bot permissions, and invite it to the testing server. Set `DISCORD_TOKEN` and `DISCORD_GUILD_ID` in `.env`, then start the bot and register its guild commands:
+Create a Discord application, configure bot permissions, and invite it to the testing server. Set `DISCORD_TOKEN` and `DISCORD_GUILD_ID` in `.env` (and `MONGODB_URI` plus the `LLM_*` settings for the `/schedule` commands), then start the bot and register its guild commands:
 
 ```bash
 python -m src

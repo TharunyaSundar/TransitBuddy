@@ -104,10 +104,12 @@ class AgentService:
     async def extract_schedule_from_image(self, image_input, mime_type: str, discord_user_id: str,
                                           discord_guild_id: str) -> ScheduleExtractionResult:
         """Read a schedule screenshot. Nothing is saved; the schedule waits for save_confirmed_schedule."""
-        result = await extract_schedule(self.vision, image_input, mime_type or "image/png")
-        if result["extracted_schedule"]["courses"]:
-            self.pending[discord_user_id] = result["extracted_schedule"]
-        return ScheduleExtractionResult.model_validate(result)
+        result = ScheduleExtractionResult.model_validate(
+            await extract_schedule(self.vision, image_input, mime_type or "image/png"))
+        if result.extracted_schedule["courses"]:
+            # the same dict the caller gets, so the caller can tell whether it is still the pending one
+            self.pending[discord_user_id] = result.extracted_schedule
+        return result
 
     @staticmethod
     def format_schedule(extracted_schedule: dict) -> str:
@@ -134,6 +136,20 @@ class AgentService:
         saved = await dbcall.call(self.db, "save_schedule", doc)
         self.pending.pop(discord_user_id, None)
         return StudentSchedule.model_validate(saved or doc)
+
+    async def view_schedule(self, discord_user_id: str, discord_guild_id: str) -> str:
+        """The student's saved schedule, and any schedule still waiting for Confirm, as Discord text."""
+        saved = await dbcall.call(self.db, "get_student_schedule", discord_guild_id or "dm", discord_user_id)
+        parts = []
+        if saved and saved.get("courses"):
+            status = "saved" if saved.get("confirmation_status") == "confirmed" else "not confirmed yet"
+            parts.append(f"Your schedule ({status}):\n{format_schedule(saved)}")
+        pending = self.pending.get(discord_user_id)
+        if pending and pending.get("courses"):
+            parts.append(f"Waiting for you to confirm:\n{format_schedule(pending)}")
+        if not parts:
+            return "You haven't saved a schedule yet. Use /schedule upload with a screenshot of your class schedule."
+        return "\n\n".join(parts)[:MAX_RESPONSE_CHARS]
 
     def discard_pending_schedule(self, discord_user_id: str) -> None:
         self.pending.pop(discord_user_id, None)
