@@ -27,9 +27,11 @@ from . import db as dbcall
 from .extraction.schedule_extraction import extract_schedule
 from .llm import create_chat_model, create_vision_model
 from .logic.schedule import format_schedule, is_valid_course, missing_for_save
+from .logic.timeutil import display, from_minutes, parse_window
 from .logic.timeutil import now as tz_now
 from .prompts.system_prompt import build_system_prompt
 from .skill_loader import load_skills, select_skills, skills_prompt
+from .travel import TravelService
 from .tools.agent_tools import (ALL_TOOLS, AgentContext, find_commute_partners, get_availability,
                                  propose_group_departure)
 
@@ -42,11 +44,15 @@ TURN_TIMEOUT_S = 150  # a whole agent turn (several model calls); each call also
 
 
 class AgentService:
-    def __init__(self, database_service=None, model=None, vision_model=None, skills=None, clock=None):
+    def __init__(self, database_service=None, model=None, vision_model=None, skills=None, clock=None,
+                 travel=None):
         """database_service: Developer 2's DatabaseService (async methods returning the shared models).
         model / vision_model: LangChain chat models (default: from LLM_* environment variables).
-        clock: optional callable returning the current datetime (tests)."""
+        clock: optional callable returning the current datetime (tests).
+        travel: TravelService for home -> class trip times (default: the Never Late trip planner, on when
+        NEVER_LATE_TOKEN is set)."""
         self.db = database_service
+        self.travel = travel if travel is not None else TravelService()
         self.model = model or create_chat_model()
         self._vision = vision_model
         self.skills = skills if skills is not None else load_skills()
@@ -80,7 +86,7 @@ class AgentService:
         now = self.clock()
         ctx = AgentContext(discord_user_id=user_id, discord_guild_id=guild_id, db=self.db,
                            channel_id=context.channel_id, mentioned_user_ids=mentioned, now=now,
-                           pending=self.pending)
+                           pending=self.pending, travel=self.travel)
         key = (guild_id, context.channel_id, user_id)
         group = {}
         for uid in mentioned:
@@ -168,7 +174,7 @@ class AgentService:
     def _command_context(self, user_id: str, guild_id: str, classmate_ids=(), display_names=None) -> AgentContext:
         group = [u for u in dict.fromkeys(classmate_ids or []) if u and u != user_id]
         return AgentContext(discord_user_id=user_id, discord_guild_id=guild_id or "dm", db=self.db,
-                            mentioned_user_ids=group, now=self.clock(), pending=self.pending,
+                            mentioned_user_ids=group, now=self.clock(), pending=self.pending, travel=self.travel,
                             display_names=dict(display_names or {}))
 
     async def commute_availability(self, discord_user_id: str, discord_guild_id: str, day: str = "today",
@@ -196,10 +202,50 @@ class AgentService:
         ctx = self._command_context(discord_user_id, discord_guild_id, classmate_ids, display_names)
         items = [c.strip() for c in (constraints or "").replace("\n", ";").split(";") if c.strip()]
         r = await commute.run_tool(propose_group_departure, ctx, day=day, direction=direction,
-                                   travel_minutes=travel_minutes or commute.DEFAULT_TRAVEL_MIN,
+                                   travel_minutes=travel_minutes,
                                    arrive_by=arrive_by, stated_constraints=items)
         r.setdefault("direction", direction)
-        return commute.plan_text(r, travel_given=travel_minutes is not None)[:MAX_RESPONSE_CHARS]
+        return commute.plan_text(r)[:MAX_RESPONSE_CHARS]
+
+    # /commute setup: area, usual departure time, transport, ride-sharing opt-in and the private home address.
+
+    async def commute_setup_defaults(self, discord_user_id: str, discord_guild_id: str) -> dict:
+        """Saved preferences to pre-fill the setup form (the student's own, including their address)."""
+        p = await dbcall.call(self.db, "get_commute_preferences", discord_guild_id or "dm", discord_user_id) or {}
+        w = parse_window(p.get("usual_departure_window") or "")
+        return {"area": p.get("general_origin_area") or "",
+                "window": f"{display(from_minutes(w[0]))}-{display(from_minutes(w[1]))}" if w else "",
+                "modes": ", ".join(p.get("preferred_transport_modes") or []),
+                "opt_in": "yes" if p.get("ride_sharing_opt_in") else "no",
+                "address": p.get("home_address") or ""}
+
+    async def save_commute_setup(self, discord_user_id: str, discord_guild_id: str, area: str, window: str = "",
+                                 modes: str = "", opt_in: str = "no", address: str = "") -> str:
+        """Validate and save the setup form. Raises ValueError with a message for the student.
+        An empty address removes a saved one. Returns a summary (never echoing the address)."""
+        setup = commute.parse_setup(area, window, modes, opt_in, address)
+        if setup["home_address"] and self.travel.enabled:
+            check = await self.travel.check_address(setup["home_address"], self.clock())
+            if check == "not_found":
+                raise ValueError("The trip planner couldn't find that home address. Check the street, city and "
+                                 "state (e.g. 123 E Main St, Mesa, AZ), or leave it empty.")
+            if check == "too_far":
+                raise ValueError("That address matched a place far from ASU Tempe. Add the city and state (e.g. "
+                                 "123 E Main St, Mesa, AZ) and check the spelling, or leave it empty.")
+        guild = discord_guild_id or "dm"
+        old = await dbcall.call(self.db, "get_commute_preferences", guild, discord_user_id) or {}
+        await dbcall.call(self.db, "save_commute_preferences", {
+            "discord_user_id": discord_user_id, "discord_guild_id": guild,
+            "general_destination_area": old.get("general_destination_area") or "ASU Tempe campus", **setup})
+        return commute.setup_summary(setup, travel_on=self.travel.enabled)
+
+    async def forget_home_address(self, discord_user_id: str, discord_guild_id: str) -> str:
+        guild = discord_guild_id or "dm"
+        p = await dbcall.call(self.db, "get_commute_preferences", guild, discord_user_id)
+        if not p or not p.get("home_address"):
+            return "You don't have a home address saved."
+        await dbcall.call(self.db, "save_commute_preferences", {**p, "home_address": None})
+        return "Deleted your home address. Plans will use estimated trip times from now on."
 
     def discard_pending_schedule(self, discord_user_id: str) -> None:
         self.pending.pop(discord_user_id, None)

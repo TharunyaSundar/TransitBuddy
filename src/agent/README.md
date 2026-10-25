@@ -82,6 +82,22 @@ How the agent works with `src/database`:
 `dev_database.py` is an in-memory version of the same contract with four fictional students, for tests and
 for the terminal chat without MongoDB.
 
+## Commute setup and home addresses
+
+`/commute setup` (also offered as a button after a schedule is saved) opens a private form: general area, usual
+departure time, transport, ride-sharing opt-in and an optional home address. It's saved with
+`save_commute_setup`, which validates every field; `forget_home_address` deletes the address.
+
+The address is stored in `CommutePreferences.home_address` and is private:
+- it's only used for the student's own trip times (`travel.py`): home to their first class building, from the
+  team's Never Late trip planner (`NEVER_LATE_TOKEN`), with buildings from the verified
+  `data/asu-buildings.json` (unknown buildings fall back to the Memorial Union, and the reply says so);
+- it's never shown to other students, used for matching, logged, or sent to the language model (the
+  preference tools show it as "saved (private)");
+- `/commute availability` adds "leave home by" for the student only, and `/commute plan` uses the longest trip
+  among members with a saved address (everyone leaves together); without addresses it's a 30-minute estimate,
+  and every reply says which.
+
 ## Tools the model can call
 
 | Tool | What it does |

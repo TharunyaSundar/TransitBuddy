@@ -1,0 +1,566 @@
+{
+  "source": "ASU Virtual Tours building pages, https://tours.asu.edu/buildings?field_campus_target_id=2 (name, code, street address, map pin); coordinates checked against the US Census geocoder, https://geocoding.geo.census.gov/; BYENG name from https://ets.engineering.asu.edu/byeng-210/",
+  "retrieved": "2026-10-24",
+  "buildings": [
+    {
+      "code": "APMA",
+      "name": "ASU Performing and Media Arts",
+      "campus": "Tempe",
+      "address": "970 E. University Dr., Tempe, AZ 85281",
+      "lat": 33.423493,
+      "lng": -111.924253,
+      "source_url": "https://tours.asu.edu/tempe/asu-performing-and-media-arts",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "ARM",
+      "name": "Armstrong Hall",
+      "campus": "Tempe",
+      "address": "1100 S. McAllister Ave., Tempe, AZ 85281",
+      "lat": 33.417881,
+      "lng": -111.929473,
+      "source_url": "https://tours.asu.edu/tempe/armstrong-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "ART",
+      "name": "Art Building",
+      "campus": "Tempe",
+      "address": "900 S. Forest Mall, Tempe, AZ 85281",
+      "lat": 33.420506,
+      "lng": -111.937354,
+      "source_url": "https://tours.asu.edu/tempe/art-building",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "ARWH",
+      "name": "Art Warehouse",
+      "campus": "Tempe",
+      "address": "851 S Myrtle Ave, Tempe, AZ 85287",
+      "lat": 33.420947,
+      "lng": -111.937949,
+      "source_url": "https://tours.asu.edu/tempe/art-warehouse",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "BA",
+      "name": "Business Administration",
+      "campus": "Tempe",
+      "address": "300 E. Lemon St., Tempe, AZ 85281",
+      "lat": 33.416557,
+      "lng": -111.934482,
+      "source_url": "https://tours.asu.edu/tempe/business-administration",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "BDA",
+      "name": "The Biodesign Institute - Bldg. A",
+      "campus": "Tempe",
+      "address": "1001 S. McAllister Ave., Tempe, AZ 85281",
+      "lat": 33.419354,
+      "lng": -111.928799,
+      "source_url": "https://tours.asu.edu/tempe/biodesign-institute-bldg-a",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "BDB",
+      "name": "The Biodesign Institute - Bldg. B",
+      "campus": "Tempe",
+      "address": "727 E. Tyler St., Tempe, AZ 85281",
+      "lat": 33.420211,
+      "lng": -111.92854,
+      "source_url": "https://tours.asu.edu/tempe/biodesign-institute-bldg-b",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "BDH",
+      "name": "Bulldog Hall",
+      "campus": "Tempe",
+      "address": "611 E. Orange St., Tempe, AZ 85281",
+      "lat": 33.418414,
+      "lng": -111.930818,
+      "source_url": "https://tours.asu.edu/tempe/bulldog-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "BKSTR",
+      "name": "Sun Devil Campus Stores",
+      "campus": "Tempe",
+      "address": "525 E. Orange St., Tempe, AZ 85281",
+      "lat": 33.418347,
+      "lng": -111.931003,
+      "source_url": "https://tours.asu.edu/tempe/sun-devil-campus-stores",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "BYAC",
+      "name": "Artisan Court at the Brickyard",
+      "campus": "Tempe",
+      "address": "30 E. 7th St., Tempe, AZ 85281",
+      "lat": 33.4235,
+      "lng": -111.939025,
+      "source_url": "https://tours.asu.edu/tempe/artisan-court-brickyard",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "BYENG",
+      "name": "Brickyard Engineering Building",
+      "campus": "Tempe",
+      "address": "699 S. Mill Ave., Tempe, AZ 85281",
+      "lat": 33.42361,
+      "lng": -111.939978,
+      "source_url": "https://ets.engineering.asu.edu/byeng-210/",
+      "coords_source": "google_maps_pin_on https://tours.asu.edu/tempe/brickyard (checked within 400 m of US Census geocode); name, code and address also on source_url"
+    },
+    {
+      "code": "BYOH",
+      "name": "Orchid House at the Brickyard",
+      "campus": "Tempe",
+      "address": "21 E. 6th St., Tempe, AZ 85281",
+      "lat": 33.424072,
+      "lng": -111.938769,
+      "source_url": "https://tours.asu.edu/tempe/orchid-house-brickyard",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "CFS",
+      "name": "Center for Family Studies",
+      "campus": "Tempe",
+      "address": "851 S. Forest Mall, Tempe, AZ 85281",
+      "lat": 33.420977,
+      "lng": -111.936249,
+      "source_url": "https://tours.asu.edu/tempe/center-family-studies",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "COOR",
+      "name": "Lattie F. Coor Hall",
+      "campus": "Tempe",
+      "address": "976 S. Forest Mall, Tempe, AZ 85281",
+      "lat": 33.419455,
+      "lng": -111.937496,
+      "source_url": "https://tours.asu.edu/tempe/lattie-f-coor-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "CRCNTR",
+      "name": "ASU Art Museum Brickyard",
+      "campus": "Tempe",
+      "address": "699 S. Mill Ave., Suite 108, Tempe, AZ 85281",
+      "lat": 33.423624,
+      "lng": -111.939612,
+      "source_url": "https://tours.asu.edu/tempe/asu-art-museum-brickyard",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "CRTVC",
+      "name": "Creativity Commons",
+      "campus": "Tempe",
+      "address": "501 E. Orange St., Tempe, AZ 85281",
+      "lat": 33.418144,
+      "lng": -111.932389,
+      "source_url": "https://tours.asu.edu/tempe/creativity-commons",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "CSB",
+      "name": "Community Services Building",
+      "campus": "Tempe",
+      "address": "200 E. Curry Rd., Tempe, AZ 85281",
+      "lat": 33.440682,
+      "lng": -111.940585,
+      "source_url": "https://tours.asu.edu/tempe/community-services-building",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "CTRPT",
+      "name": "Centerpoint",
+      "campus": "Tempe",
+      "address": "660 S. Mill Ave., Tempe, AZ 85281",
+      "lat": 33.423821,
+      "lng": -111.941069,
+      "source_url": "https://tours.asu.edu/tempe/centerpoint",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "EDB",
+      "name": "Ira D. Payne Educational Hall",
+      "campus": "Tempe",
+      "address": "1000 S. Forest Mall, Tempe, AZ 85281",
+      "lat": 33.41889,
+      "lng": -111.937277,
+      "source_url": "https://tours.asu.edu/tempe/panye-educational-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "FAC",
+      "name": "J. Russell and Bonita Nelson Fine Arts Center",
+      "campus": "Tempe",
+      "address": "51 E. 10th St., Tempe, AZ 85281",
+      "lat": 33.418845,
+      "lng": -111.938653,
+      "source_url": "https://tours.asu.edu/tempe/nelson-fine-arts-center",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "FULTN",
+      "name": "Fulton Center",
+      "campus": "Tempe",
+      "address": "300 E. University Dr., Tempe, AZ 85281",
+      "lat": 33.422297,
+      "lng": -111.934438,
+      "source_url": "https://tours.asu.edu/tempe/fulton-center",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "GGMA",
+      "name": "ASU Gammage",
+      "campus": "Tempe",
+      "address": "1200 S. Forest Ave., Tempe, AZ 85281",
+      "lat": 33.41627,
+      "lng": -111.938072,
+      "source_url": "https://tours.asu.edu/tempe/asu-gammage",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "HLMK",
+      "name": "Paul C. Helmick Center",
+      "campus": "Tempe",
+      "address": "660 S. College Ave., Tempe, AZ 85281",
+      "lat": 33.423574,
+      "lng": -111.935219,
+      "source_url": "https://tours.asu.edu/tempe/paul-helmick-center",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "HSB",
+      "name": "Health Service Building",
+      "campus": "Tempe",
+      "address": "451 E. University Dr., Tempe, AZ 85281",
+      "lat": 33.421346,
+      "lng": -111.93304,
+      "source_url": "https://tours.asu.edu/tempe/health-service-building",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "ISTB1",
+      "name": "Interdisciplinary Science and Technology I",
+      "campus": "Tempe",
+      "address": "550 E. Orange St., Tempe, AZ 85281",
+      "lat": 33.418477,
+      "lng": -111.93071,
+      "source_url": "https://tours.asu.edu/tempe/interdisciplinary-science-technology-1",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "ISTB2",
+      "name": "Interdisciplinary Science and Technology II",
+      "campus": "Tempe",
+      "address": "850 S. McAllister Ave., Tempe, AZ 85281",
+      "lat": 33.421064,
+      "lng": -111.929613,
+      "source_url": "https://tours.asu.edu/tempe/interdisciplinary-science-technology-2",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "ISTB4",
+      "name": "Interdisciplinary Science and Technology IV",
+      "campus": "Tempe",
+      "address": "781 E. Terrace Mall, Tempe, AZ 85281",
+      "lat": 33.417921,
+      "lng": -111.928355,
+      "source_url": "https://tours.asu.edu/tempe/interdisciplinary-science-technology-4",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "LIB",
+      "name": "Hayden Library",
+      "campus": "Tempe",
+      "address": "300 E. Orange Mall, Tempe, AZ 85281",
+      "lat": 33.419075,
+      "lng": -111.934614,
+      "source_url": "https://tours.asu.edu/tempe/hayden-library",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "LYC",
+      "name": "Lyceum Theatre",
+      "campus": "Tempe",
+      "address": "901 S. Forest Mall, Tempe, AZ 85281",
+      "lat": 33.420521,
+      "lng": -111.936389,
+      "source_url": "https://tours.asu.edu/tempe/lyceum-theatre",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "MANZH",
+      "name": "Manzanita Hall",
+      "campus": "Tempe",
+      "address": "600 E. University Dr., Tempe, AZ 85281",
+      "lat": 33.422626,
+      "lng": -111.930373,
+      "source_url": "https://tours.asu.edu/tempe/manzanita-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "MASH",
+      "name": "Tempe’s New Residence Hall",
+      "campus": "Tempe",
+      "address": "930 S Myrtle Ave, Tempe, AZ 85281",
+      "lat": 33.420098,
+      "lng": -111.938184,
+      "source_url": "https://tours.asu.edu/tempe/new-residence-hall",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "MB",
+      "name": "Best Hall",
+      "campus": "Tempe",
+      "address": "1201 S. Forest Ave., Tempe, AZ 85281",
+      "lat": 33.415837,
+      "lng": -111.936492,
+      "source_url": "https://tours.asu.edu/tempe/best-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "MCL",
+      "name": "McClintock Hall",
+      "campus": "Tempe",
+      "address": "951 S. Forest Mall, Tempe, AZ 85281",
+      "lat": 33.419704,
+      "lng": -111.935821,
+      "source_url": "https://tours.asu.edu/tempe/mcclintock-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "MHALL",
+      "name": "Matthews Hall",
+      "campus": "Tempe",
+      "address": "925 S. Forest Mall, Tempe, AZ 85281",
+      "lat": 33.420149,
+      "lng": -111.936127,
+      "source_url": "https://tours.asu.edu/tempe/matthews-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "MU",
+      "name": "Memorial Union",
+      "campus": "Tempe",
+      "address": "1290 S. Normal Ave., Tempe, AZ 85287",
+      "lat": 33.417732,
+      "lng": -111.934419,
+      "source_url": "https://tours.asu.edu/tempe/memorial-union",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "MUR",
+      "name": "Murdock Hall",
+      "campus": "Tempe",
+      "address": "450 E. Orange St., Tempe, AZ 85281",
+      "lat": 33.418593,
+      "lng": -111.93304,
+      "source_url": "https://tours.asu.edu/tempe/murdock-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "NEEB",
+      "name": "L. S. Neeb Hall",
+      "campus": "Tempe",
+      "address": "920 S. Forest Mall, Tempe, AZ 85281",
+      "lat": 33.420341,
+      "lng": -111.936889,
+      "source_url": "https://tours.asu.edu/tempe/neeb-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "PSY",
+      "name": "Psychology Building",
+      "campus": "Tempe",
+      "address": "950 S. McAllister Ave., Tempe, AZ 85281",
+      "lat": 33.419874,
+      "lng": -111.929551,
+      "source_url": "https://tours.asu.edu/tempe/psychology-building",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "PSYN",
+      "name": "Psychology North",
+      "campus": "Tempe",
+      "address": "900 S. McAllister Ave., Tempe, AZ 85281",
+      "lat": 33.420651,
+      "lng": -111.929582,
+      "source_url": "https://tours.asu.edu/tempe/psychology-north",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "PVE",
+      "name": "Palo Verde East",
+      "campus": "Tempe",
+      "address": "510 E. University Dr., Tempe, AZ 85281",
+      "lat": 33.422416,
+      "lng": -111.932008,
+      "source_url": "https://tours.asu.edu/tempe/palo-verde-east",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "PVW",
+      "name": "Palo Verde West",
+      "campus": "Tempe",
+      "address": "430 E. University Dr., Tempe, AZ 85281",
+      "lat": 33.421981,
+      "lng": -111.933075,
+      "source_url": "https://tours.asu.edu/tempe/palo-verde-west",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "PWOP",
+      "name": "University Bridge",
+      "campus": "Tempe",
+      "address": "452 E. University Dr., Tempe, AZ 85281",
+      "lat": 33.422046,
+      "lng": -111.932634,
+      "source_url": "https://tours.asu.edu/tempe/palm-walk-overpass",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "RBHL",
+      "name": "Ross-Blakley Hall",
+      "campus": "Tempe",
+      "address": "1102 S. McAllister Ave., Tempe, AZ 85281",
+      "lat": 33.417094,
+      "lng": -111.92972,
+      "source_url": "https://tours.asu.edu/tempe/ross-blakley-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "SCD",
+      "name": "Sonora Center",
+      "campus": "Tempe",
+      "address": "1480 S. Rural Rd., Tempe, AZ 85281",
+      "lat": 33.411957,
+      "lng": -111.926348,
+      "source_url": "https://tours.asu.edu/tempe/sonora-center",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "SCOB",
+      "name": "John W. Schwada Building",
+      "campus": "Tempe",
+      "address": "620 E. Orange St., Tempe, AZ 85281",
+      "lat": 33.418781,
+      "lng": -111.930679,
+      "source_url": "https://tours.asu.edu/tempe/schwada-building",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "SDH",
+      "name": "Sun Devil Hall",
+      "campus": "Tempe",
+      "address": "451 E. Orange St., Tempe, AZ 85281",
+      "lat": 33.41834,
+      "lng": -111.933055,
+      "source_url": "https://tours.asu.edu/tempe/sun-devil-hall",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "SSV",
+      "name": "Student Services Building",
+      "campus": "Tempe",
+      "address": "1151 S. Forest Ave., Tempe, AZ 85281",
+      "lat": 33.416861,
+      "lng": -111.936534,
+      "source_url": "https://tours.asu.edu/tempe/student-services-building",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "STPV",
+      "name": "Student Pavilion",
+      "campus": "Tempe",
+      "address": "400 E. Orange St., Tempe, AZ 85287",
+      "lat": 33.418554,
+      "lng": -111.933703,
+      "source_url": "https://tours.asu.edu/tempe/student-pavilion",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    },
+    {
+      "code": "UCLUB",
+      "name": "University Club",
+      "campus": "Tempe",
+      "address": "425 E. University Dr., Tempe, AZ 85281",
+      "lat": 33.421927,
+      "lng": -111.933046,
+      "source_url": "https://tours.asu.edu/tempe/university-club",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "UGB",
+      "name": "University Gateway Building",
+      "campus": "Tempe",
+      "address": "947 S Mill Ave., Tempe, AZ 85281",
+      "lat": 33.420911,
+      "lng": -111.939902,
+      "source_url": "https://tours.asu.edu/tempe/gateway",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "UNIVT",
+      "name": "University Towers",
+      "campus": "Tempe",
+      "address": "525 S. Forest Ave., Tempe, AZ 85281",
+      "lat": 33.425215,
+      "lng": -111.936585,
+      "source_url": "https://tours.asu.edu/tempe/university-towers",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "USB",
+      "name": "University Services",
+      "campus": "Tempe",
+      "address": "1551 S. Rural Rd., Tempe, AZ 85281",
+      "lat": 33.411978,
+      "lng": -111.926211,
+      "source_url": "https://tours.asu.edu/tempe/university-services",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "USE",
+      "name": "Urban Systems Engineering",
+      "campus": "Tempe",
+      "address": "651 E. University Dr., Tempe, AZ 85281",
+      "lat": 33.421963,
+      "lng": -111.929706,
+      "source_url": "https://tours.asu.edu/tempe/urban-systems-engineering",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "VDS",
+      "name": "Vista Del Sol",
+      "campus": "Tempe",
+      "address": "701 E Apache Blvd, Tempe, AZ 85281",
+      "lat": 33.414691,
+      "lng": -111.928995,
+      "source_url": "https://tours.asu.edu/tempe/vista-del-sol",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "VVDS",
+      "name": "Villas at Vista",
+      "campus": "Tempe",
+      "address": "551 E. Apache Blvd, Tempe, AZ 85281",
+      "lat": 33.41467,
+      "lng": -111.931195,
+      "source_url": "https://tours.asu.edu/tempe/villas-at-vista",
+      "coords_source": "us_census_geocoder"
+    },
+    {
+      "code": "WCPH",
+      "name": "Rob and Melani Walton Center for Planetary Health",
+      "campus": "Tempe",
+      "address": "777 E University Dr, Tempe, AZ 85281",
+      "lat": 33.422097,
+      "lng": -111.926995,
+      "source_url": "https://tours.asu.edu/tempe/walton-center-planetary-health",
+      "coords_source": "google_maps_pin_on_source_page (checked within 400 m of US Census geocode)"
+    }
+  ]
+}

@@ -31,7 +31,8 @@ ride, rides, uber, lyft, share, sharing, carpool, split, group, pick, pickup, re
 
 ## Rules and constraints
 - Respect explicit opt-in behavior.
-- Keep suggestions general and not based on exact addresses.
+- Keep suggestions general and not based on exact addresses. A saved home address only sets that
+  student's own trip time; it is never shown to other students or used for matching.
 - Prefer negotiation rather than forcing a departure time.
 - Distinguish between ideal and realistic departure times.
 

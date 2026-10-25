@@ -108,6 +108,7 @@ jobs:
           DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+          NEVER_LATE_TOKEN: ${{ secrets.NEVER_LATE_TOKEN }}  # optional: real trip times from home addresses
           MONGODB_DATABASE: ${{ vars.MONGODB_DATABASE || 'transit_buddy' }}
           LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'ollama' }}
           LLM_MODEL: ${{ vars.LLM_MODEL || 'gemma4:31b' }}  # direct-API name; ':cloud' names need the local app
@@ -122,7 +123,7 @@ jobs:
           umask 077
           for v in DISCORD_TOKEN DISCORD_CLIENT_ID DISCORD_GUILD_ID MONGODB_URI MONGODB_DATABASE \
                    LLM_PROVIDER LLM_MODEL VISION_MODEL LLM_REASONING OLLAMA_BASE_URL OLLAMA_API_KEY \
-                   DEFAULT_TIMEZONE; do
+                   NEVER_LATE_TOKEN DEFAULT_TIMEZONE; do
             printf '%s=%s\n' "$v" "${!v}"
           done > "$RUNNER_TEMP/bot.env"
           printf 'APP_ENV=production\n' >> "$RUNNER_TEMP/bot.env"

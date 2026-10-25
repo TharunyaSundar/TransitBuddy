@@ -34,6 +34,7 @@ Transit Buddy combines a Discord interface, a MongoDB-backed data layer, and a L
 - Python Discord client with `/ping`, `/status`, and mention responses
 - `/schedule upload` (review a screenshot privately, then Confirm or Cancel) and `/schedule view`
 - `/commute availability`, `/commute match` (opted-in partners) and `/commute plan` (a shared departure time)
+- `/commute setup`: a private form for general area, usual departure time, transport, ride-sharing opt-in and an optional home address (only used for that student's own trip times; `/commute forget-address` deletes it)
 - Guild slash-command registration script
 
 ## Technology Stack

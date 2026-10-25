@@ -4,6 +4,7 @@ Slash commands already give structured input, so these run the agent's tools dir
 model: faster, no tokens, and every time shown comes from the schedule data and the negotiation logic.
 """
 import json
+import re
 from types import SimpleNamespace
 
 from .logic.timeutil import display, parse_window
@@ -48,6 +49,8 @@ def availability_text(r: dict) -> str:
             text = "no classes"
         if p.get("usual_departure_window"):
             text += f"; usually leaves {_window(p['usual_departure_window'])}"
+        if p.get("leaveHomeBy"):
+            text += f"; leave home by {p['leaveHomeBy']} ({p['trip']})"
         lines.append(f"- {_who(p['who'])}: {text}")
     lines.append("\n\"Classes over at\" is when classes end, not when anyone has agreed to leave.")
     return "\n".join(lines)
@@ -63,7 +66,8 @@ def match_text(r: dict) -> str:
     scope = "" if r.get("searchedWholeServer") else \
         "\nI can only check classmates you add to the command and students with open ride requests."
     if not r["matches"]:
-        return f"No opted-in students with similar times going {where} on {r['day']}.{scope}"
+        return (f"No opted-in students from your area with similar times and a shared way to travel, going "
+                f"{where} on {r['day']}.{scope}")
     lines = [f"**Possible partners going {where} on {r['day']}:**"]
     for m in r["matches"]:
         lines.append(f"- **{m['who']}**: {', '.join(m['reasons'])}")
@@ -71,7 +75,17 @@ def match_text(r: dict) -> str:
     return "\n".join(lines)
 
 
-def plan_text(r: dict, travel_given: bool) -> str:
+def _trip_line(r: dict) -> str:
+    n, source = r["travelMinutesAssumed"], r.get("travelSource") or "estimate"
+    if source == "given":
+        return f"Based on a {n}-minute trip."
+    if source.startswith("trip planner"):
+        return f"Based on a {n}-minute trip: the longest trip from your saved homes, from the trip planner."
+    return (f"Assuming a {n}-minute trip (an estimate: save a home address with /commute setup, or set "
+            f"travel_minutes).")
+
+
+def plan_text(r: dict) -> str:
     if not r.get("ok"):
         if r.get("code") == "no_info":
             no_schedule = r.get("noScheduleFor") or []
@@ -95,8 +109,7 @@ def plan_text(r: dict, travel_given: bool) -> str:
         if r.get("code") == "need_group":
             return "Add at least one classmate to plan with."
         return r.get("error", "I couldn't plan a departure right now.")
-    trip = (f"Based on a {r['travelMinutesAssumed']}-minute trip." if travel_given else
-            f"Assuming a {r['travelMinutesAssumed']}-minute trip (set travel_minutes if it's different).")
+    trip = _trip_line(r)
     if r["status"] == "impossible_for_some":
         lines = [f"This can't work on {r['day']}:"]
         lines += [f"- {_who(n)} {why}" for n, why in r["participants"].items()]
@@ -120,4 +133,54 @@ def plan_text(r: dict, travel_given: bool) -> str:
         lines.append("Couldn't use: " + "; ".join(f"\"{c}\"" for c in r["ignoredConstraints"])
                      + " (name someone in the group and a time).")
     lines.append(trip)
+    return "\n".join(lines)
+
+
+YES = {"yes", "y", "true", "1", "on", "sure", "ok"}
+NO = {"no", "n", "false", "0", "off", ""}
+_STREETISH = re.compile(r"\d{2,}\s+\w+|\b(st|ave|rd|blvd|dr|apt|unit)\b|#", re.I)
+
+
+def parse_setup(area: str, window: str, modes: str, opt_in: str, address: str) -> dict:
+    """The /commute setup form -> CommutePreferences fields. Raises ValueError with a student-facing message."""
+    from .logic.schedule import _start_end
+    area = (area or "").strip()
+    if not area:
+        raise ValueError("Add your general area (for example Mesa or Downtown Phoenix).")
+    if _STREETISH.search(area):
+        raise ValueError("The area should be general, like Mesa or North Tempe. Put your street address in the "
+                         "home address box instead (it stays private).")
+    usual = ""
+    if (window or "").strip():
+        parts = re.split(r"\s*(?:-|–|—|to)\s*", window.strip(), maxsplit=1)
+        start, end = _start_end(parts[0], parts[1]) if len(parts) == 2 else (None, None)
+        if not start or not end or end <= start:
+            raise ValueError("Write the usual departure time as a range, like 8:00-8:30 AM.")
+        usual = f"{start}-{end}"
+    choice = (opt_in or "").strip().lower()
+    if choice not in YES | NO:
+        raise ValueError("Answer yes or no to sharing rides with other students.")
+    address = (address or "").strip()
+    if address and (len(address) < 6 or not re.search(r"\d", address) or not re.search(r"[A-Za-z]", address)):
+        raise ValueError("Enter a full street address (for example 123 E Main St, Mesa, AZ), or leave it empty.")
+    if len(address) > 200:
+        raise ValueError("That address is too long.")
+    mode_list = [m.strip().lower() for m in re.split(r"[,/;]|\band\b", modes or "") if m.strip()][:5]
+    return {"general_origin_area": area, "usual_departure_window": usual, "preferred_transport_modes": mode_list,
+            "ride_sharing_opt_in": choice in YES, "home_address": address or None}
+
+
+def setup_summary(setup: dict, travel_on: bool) -> str:
+    lines = ["Saved your commute setup:", f"- Area: {setup['general_origin_area']}"]
+    if setup["usual_departure_window"]:
+        lines.append(f"- Usually leave: {_window(setup['usual_departure_window'])}")
+    if setup["preferred_transport_modes"]:
+        lines.append(f"- Getting there: {', '.join(setup['preferred_transport_modes'])}")
+    lines.append(f"- Ride-sharing matches: {'on' if setup['ride_sharing_opt_in'] else 'off'}")
+    if setup["home_address"]:
+        lines.append("- Home address: saved privately. Only used for your own trip times"
+                     + ("." if travel_on else " (trip times are off on this bot, so plans use estimates)."))
+    else:
+        lines.append("- Home address: not saved (plans use estimated trip times)")
+    lines.append("Change it any time with /commute setup; /commute forget-address deletes the address.")
     return "\n".join(lines)

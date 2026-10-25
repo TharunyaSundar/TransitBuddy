@@ -35,6 +35,7 @@ class AgentContext:
     now: datetime | None = None
     pending: dict = field(default_factory=dict)  # pending schedules by user id (shared with AgentService)
     display_names: dict = field(default_factory=dict)  # user id -> name Discord showed, used before the database
+    travel: Any = None  # TravelService: home -> class trip times (None or disabled = estimates only)
     events: dict = field(default_factory=dict)  # facts for the response metadata
 
 
@@ -127,10 +128,15 @@ async def get_availability(runtime: ToolRuntime[AgentContext], day: str = "today
     d = resolve_day(day, _now(ctx))
     out = []
     for uid in [ctx.discord_user_id, *ctx.mentioned_user_ids]:
-        av, _, _ = await _availability(ctx, uid, d)
+        av, prefs, sched = await _availability(ctx, uid, d)
         entry = {"who": await _name(ctx, uid), "has_classes": av.has_classes, "notes": av.notes}
         if av.has_classes:
             entry.update(onCampusBy=display(av.arrive_by), classesOverAt=display(av.last_class_end))
+            if uid == ctx.discord_user_id:  # only ever the student's own home, never a classmate's
+                trip = await _trip(ctx, prefs, sched, d, av.arrive_by)
+                if trip:
+                    entry.update(leaveHomeBy=display(from_minutes(to_minutes(av.arrive_by) - trip.minutes)),
+                                 trip=f"{trip.describe()} to {trip.destination}, from the trip planner")
         if av.preferred_window:
             entry["usual_departure_window"] = av.preferred_window
         out.append(entry)
@@ -178,6 +184,44 @@ async def find_commute_partners(runtime: ToolRuntime[AgentContext], day: str = "
                  "note": "Only students who opted in to ride-sharing are included. Ask before connecting them."})
 
 
+DEFAULT_TRAVEL_MIN = 30
+
+
+def _first_class(sched: dict | None, day: str):
+    from ..logic.schedule import classes_on
+    classes = classes_on(sched, day)
+    return classes[0] if classes else None
+
+
+async def _trip(ctx: AgentContext, prefs: dict | None, sched: dict | None, day: str, arrive_by: str | None):
+    """Home -> first class building on `day`, arriving by `arrive_by` (HH:mm). None if unknown."""
+    if not ctx.travel or not (prefs or {}).get("home_address") or not arrive_by:
+        return None
+    from ..travel import class_arrival, planner_mode
+    first = _first_class(sched, day)
+    return await ctx.travel.minutes(prefs["home_address"], first["location"] if first else None,
+                                    planner_mode(prefs.get("preferred_transport_modes")),
+                                    class_arrival(_now(ctx), day, arrive_by))
+
+
+async def _group_trip(ctx: AgentContext, group: list[str], day: str, direction: str,
+                      arrive_by: str | None) -> tuple[int, str]:
+    """Trip time for a group plan: the longest home -> campus trip among members with a saved address
+    (everyone leaves together, so the farthest one sets it), else a 30-minute estimate."""
+    if direction != "to_campus" or not ctx.travel:
+        return DEFAULT_TRAVEL_MIN, "estimate"
+    trips = []
+    for uid in group:
+        av, prefs, sched = await _availability(ctx, uid, day)
+        target = normalize_time(arrive_by) if arrive_by else av.arrive_by
+        trip = await _trip(ctx, prefs, sched, day, target)
+        if trip:
+            trips.append(trip.minutes)
+    if not trips:
+        return DEFAULT_TRAVEL_MIN, "estimate"
+    return max(trips), f"trip planner ({len(trips)} of {len(group)} homes)"
+
+
 _TIME = r"(\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)?)"
 _EARLIEST = re.compile(r"(?:not before|can'?t leave before|cannot leave before|no earlier than|earliest|after|from|"
                        r"not until|only after)\s*(?:at\s*)?" + _TIME, re.I)
@@ -217,13 +261,14 @@ def parse_constraint(text: str, me: str, names: dict[str, str]) -> tuple[str | N
 @tool
 @_guarded
 async def propose_group_departure(runtime: ToolRuntime[AgentContext], day: str = "today",
-                                  direction: str = "to_campus", travel_minutes: int = 30,
+                                  direction: str = "to_campus", travel_minutes: int | None = None,
                                   arrive_by: str | None = None,
                                   stated_constraints: list[Any] | str | None = None) -> str:
     """Negotiate one departure time for the user and the students they @mentioned, from their schedules and
     saved departure windows. stated_constraints: what people said in the chat, one short sentence each, e.g.
     ["Priya can't leave before 8:28 AM", "I must leave by 8:20 AM"]. travel_minutes: trip length the group
-    gave; if they didn't say, keep 30 and tell them it's an estimate. arrive_by: only if the user named a time
+    gave; leave it empty otherwise (the tool uses trip times from saved home addresses, or a 30-minute
+    estimate, and says which). arrive_by: only if the user named a time
     the group must be on campus (otherwise class times are used). Only report times this tool returns."""
     ctx = runtime.context
     if direction not in DIRECTIONS:
@@ -234,6 +279,9 @@ async def propose_group_departure(runtime: ToolRuntime[AgentContext], day: str =
     d = resolve_day(day, _now(ctx))
     group = [ctx.discord_user_id, *ctx.mentioned_user_ids]
     names = {uid: await _name(ctx, uid) for uid in group}
+    travel_source = "given"
+    if travel_minutes is None:
+        travel_minutes, travel_source = await _group_trip(ctx, group, d, direction, arrive_by)
     items = [stated_constraints] if isinstance(stated_constraints, str) else list(stated_constraints or [])
     stated, ignored = {}, []
     for item in items:
@@ -274,7 +322,7 @@ async def propose_group_departure(runtime: ToolRuntime[AgentContext], day: str =
             result[k] = display(result[k])
     result["windows"] = {names[u]: window_text(w[0], w[1]) + (f" ({'; '.join(w[2])})" if w[2] else "")
                          for u, w in windows.items()}
-    result.update(ok=True, day=d, direction=direction, travelMinutesAssumed=travel_minutes)
+    result.update(ok=True, day=d, direction=direction, travelMinutesAssumed=travel_minutes, travelSource=travel_source)
     result["constraintsUsed"] = {names[u]: c for u, c in stated.items()}
     if ignored:
         result["ignoredConstraints"] = ignored
@@ -287,7 +335,10 @@ async def get_my_commute_preferences(runtime: ToolRuntime[AgentContext]) -> str:
     """Get the user's saved commute preferences (general area, modes, usual departure window, opt-in)."""
     ctx = runtime.context
     p = await dbcall.call(ctx.db, "get_commute_preferences", ctx.discord_guild_id, ctx.discord_user_id)
-    return _out({"ok": True, "preferences": p} if p else {"ok": False, "error": "No preferences saved yet."})
+    if not p:
+        return _out({"ok": False, "error": "No preferences saved yet. They can save them with /commute setup."})
+    p = {**p, "home_address": "saved (private)" if p.get("home_address") else "not saved"}  # never the address
+    return _out({"ok": True, "preferences": p})
 
 
 _ADDRESS = re.compile(r"\d{2,}\s+\w+|\b(st|ave|rd|blvd|dr|apt|unit|#)\b", re.I)
@@ -319,9 +370,11 @@ async def save_commute_preferences(runtime: ToolRuntime[AgentContext], general_o
         "preferred_transport_modes": preferred_transport_modes or old.get("preferred_transport_modes", []),
         "usual_departure_window": f"{from_minutes(w[0])}-{from_minutes(w[1])}" if w else old.get("usual_departure_window", ""),
         "ride_sharing_opt_in": ride_sharing_opt_in if ride_sharing_opt_in is not None else old.get("ride_sharing_opt_in", False),
+        "home_address": old.get("home_address"),  # only /commute setup changes the private address
     }
     saved = await dbcall.call(ctx.db, "save_commute_preferences", prefs)
-    return _out({"ok": True, "saved": saved or prefs})
+    shown = {**(saved or prefs), "home_address": "saved (private)" if prefs["home_address"] else "not saved"}
+    return _out({"ok": True, "saved": shown})
 
 
 @tool

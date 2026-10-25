@@ -10,6 +10,8 @@ from discord import app_commands
 
 from src.utils.logger import log
 
+from .setup import SetupPromptView
+
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 REVIEW_TIMEOUT_S = 600
 SEMESTER_HINT = ("The screenshot doesn't show the semester. Cancel and upload again with the semester option, "
@@ -51,8 +53,10 @@ class ConfirmScheduleView(discord.ui.View):
             await interaction.response.send_message("Saving failed. Please try again in a minute.", ephemeral=True)
             return
         self.stop()
-        await interaction.response.edit_message(content="Saved your schedule. Use /schedule view to see it.",
-                                                view=None)
+        await interaction.response.edit_message(
+            content="Saved your schedule. Use /schedule view to see it.\nNext, set up your commute so I can plan "
+                    "trips: your area, usual departure time, ride-sharing and (optional, private) home address.",
+            view=SetupPromptView(self.agent, self.user_id))
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:

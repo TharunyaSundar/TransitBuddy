@@ -117,7 +117,9 @@ def test_confirm_saves_and_view_shows_it():
     view = upload(agent).followup.sent[0]["view"]
     press = interaction()
     asyncio.run(view.children[0].callback(press))  # Confirm
-    assert press.response.edited[0] == {"content": "Saved your schedule. Use /schedule view to see it.", "view": None}
+    edited = press.response.edited[0]
+    assert edited["content"].startswith("Saved your schedule. Use /schedule view to see it.")
+    assert [c.label for c in edited["view"].children] == ["Set up your commute"]  # next step: the setup form
     saved = asyncio.run(db.get_student_schedule(DEMO_GUILD, USER))
     assert saved.confirmation_status == "confirmed" and saved.courses[0].course_code == "CSE 340"
     assert agent.pending_schedule(USER) is None

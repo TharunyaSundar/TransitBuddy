@@ -123,3 +123,22 @@ def test_ride_request_lifecycle():
         assert await db.get_open_ride_requests("g") == []
         assert await db.update_ride_request_status("missing", "open") is None
     in_db(t)
+
+
+@needs_db
+def test_opted_in_preferences_and_private_home_address():
+    async def t():
+        def prefs(g, u, opt_in, address=None):
+            return CommutePreferences(discord_user_id=u, discord_guild_id=g, general_origin_area="Mesa",
+                                      general_destination_area="ASU Tempe campus", preferred_transport_modes=[],
+                                      usual_departure_window="", ride_sharing_opt_in=opt_in, home_address=address)
+        await db.save_commute_preferences(prefs("g", "a", True, "123 Example St, Mesa, AZ"))
+        await db.save_commute_preferences(prefs("g", "b", False))
+        await db.save_commute_preferences(prefs("other", "c", True))
+        opted = await db.get_opted_in_commute_preferences("g")
+        assert [p.discord_user_id for p in opted] == ["a"]  # not b (opted out), not c (other guild)
+        assert (await db.get_commute_preferences("g", "a")).home_address == "123 Example St, Mesa, AZ"
+        assert (await db.get_commute_preferences("g", "b")).home_address is None
+        await db.save_commute_preferences(prefs("g", "a", True, None))  # forget the address
+        assert (await db.get_commute_preferences("g", "a")).home_address is None
+    in_db(t)

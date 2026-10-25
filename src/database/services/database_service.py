@@ -45,6 +45,10 @@ class DatabaseService:
     ) -> CommutePreferences | None:
         return await repos.commute_preferences.find(discord_guild_id, discord_user_id)
 
+    async def get_opted_in_commute_preferences(self, discord_guild_id: str) -> list[CommutePreferences]:
+        """Everyone in the guild who opted in to ride-sharing matching (uses the guild_optin index)."""
+        return await repos.commute_preferences.find_where(discord_guild_id, ride_sharing_opt_in=True)
+
     async def create_ride_request(self, request: RideRequest) -> RideRequest:
         return await ride_requests.create(request)
 

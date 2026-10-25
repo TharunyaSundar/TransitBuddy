@@ -11,6 +11,7 @@ If it is up, the server is rebuilt fresh from the pushed commit. If it is destro
 1. `./infra/bootstrap.sh` (local admin AWS creds): creates the state bucket and the OIDC deploy role.
 2. In GitHub > Settings > Secrets and variables > Actions:
    - Secrets: `AWS_ROLE_ARN`, `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_GUILD_ID`, `MONGODB_URI`, `OLLAMA_API_KEY`
+     (optional: `NEVER_LATE_TOKEN` for real trip times from students' saved home addresses)
    - Variable: `TF_STATE_BUCKET` (optional overrides: `LLM_MODEL`, `VISION_MODEL`, `LLM_REASONING`, `MONGODB_DATABASE`, ...)
 3. The workflow file must be on `main` (workflow_dispatch and the AWS role are limited to `main`).
 

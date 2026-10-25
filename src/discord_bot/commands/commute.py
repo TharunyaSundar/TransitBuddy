@@ -11,6 +11,7 @@ from discord import app_commands
 from src.utils.logger import log
 
 from .schedule import NOT_READY
+from .setup import open_setup_form
 
 DIRECTIONS = [app_commands.Choice(name="to campus", value="to_campus"),
               app_commands.Choice(name="from campus", value="from_campus")]
@@ -101,5 +102,18 @@ def build_commute_group(get_agent: Callable[[], object]) -> app_commands.Group:
                       lambda a: a.commute_plan(user, guild, others, day, way, travel_minutes, arrive_by, constraints,
                                                display_names=_names(classmate1, classmate2, classmate3)),
                       private=not share)
+
+    @group.command(name="setup", description="Save your area, usual departure time, ride-sharing and home address.")
+    async def setup(interaction: discord.Interaction) -> None:
+        agent = get_agent()
+        if agent is None:
+            await interaction.response.send_message(NOT_READY, ephemeral=True)
+            return
+        await open_setup_form(interaction, agent)
+
+    @group.command(name="forget-address", description="Delete your saved home address.")
+    async def forget_address(interaction: discord.Interaction) -> None:
+        user, guild = str(interaction.user.id), str(interaction.guild_id)
+        await _answer(interaction, get_agent, lambda a: a.forget_home_address(user, guild))
 
     return group

@@ -63,7 +63,7 @@ def reply(inter) -> dict:
 def test_bot_registers_commute_group():
     bot = create_discord_client()
     group = bot.tree.get_command("commute")
-    assert sorted(c.name for c in group.commands) == ["availability", "match", "plan"]
+    assert sorted(c.name for c in group.commands) == ["availability", "forget-address", "match", "plan", "setup"]
     assert group.guild_only
     plan = group.get_command("plan")
     assert [p.name for p in plan.parameters if p.required] == ["classmate1"]
@@ -98,7 +98,7 @@ def test_match_explains_limited_search_without_opted_in_query():
     assert "I can only check classmates you add" in out["content"]
     db.rides.clear()
     out = reply(run("match", agent_for(db)))
-    assert "No opted-in students with similar times going to campus on Monday." in out["content"]
+    assert "No opted-in students from your area with similar times and a shared way to travel, going to campus on Monday." in out["content"]
 
 
 def test_match_without_saved_area():
