@@ -1,218 +1,85 @@
 # Integration Contracts
 
-This document defines the service boundaries for the project. These interfaces are intentionally simple and designed for independent development on separate branches.
+This document defines the service boundaries for the project. These interfaces are intentionally simple and designed for independent development on separate branches. The data models live in `transit_buddy/shared/contracts.py` (Pydantic, snake_case fields; timestamps are ISO-8601 strings).
 
 ## DatabaseService
 
 The DatabaseService contract is owned by the MongoDB developer and consumed by the agent developer. The service must manage student, schedule, commute, and ride request data scoped to a Discord guild.
 
-```js
-/**
- * @typedef {Object} Student
- * @property {string} discordUserId
- * @property {string} discordGuildId
- * @property {string} displayName
- * @property {string} university
- * @property {string} campus
- * @property {string} timezone
- * @property {string} createdAt
- * @property {string} updatedAt
- */
-
-/**
- * @typedef {Object} StudentSchedule
- * @property {string} discordUserId
- * @property {string} discordGuildId
- * @property {string} semester
- * @property {Array<Object>} courses
- * @property {'pending_confirmation'|'confirmed'} confirmationStatus
- * @property {string} updatedAt
- */
-
-/**
- * @typedef {Object} CommutePreferences
- * @property {string} discordUserId
- * @property {string} discordGuildId
- * @property {string} generalOriginArea
- * @property {string} generalDestinationArea
- * @property {string[]} preferredTransportModes
- * @property {string} usualDepartureWindow
- * @property {boolean} rideSharingOptIn
- */
-
-/**
- * @typedef {Object} RideRequest
- * @property {string} requestId
- * @property {string} discordUserId
- * @property {string} discordGuildId
- * @property {string} originArea
- * @property {string} destinationArea
- * @property {string} desiredDepartureTime
- * @property {'open'|'matched'|'cancelled'|'completed'} status
- * @property {string} createdAt
- */
-```
+Models: `Student`, `StudentSchedule` (`courses` -> `meeting_patterns`, `confirmation_status` is `pending_confirmation` or `confirmed`), `CommutePreferences`, `RideRequest` (`status` is `open`, `matched`, `cancelled`, or `completed`). See `contracts.py` for every field.
 
 ### Required methods
 
-```js
-/**
- * Insert or update a student document by Discord guild and user identity.
- *
- * @param {Student} student
- * @returns {Promise<Student>}
- * @throws {Error} If required identifiers are missing or persistence fails.
- */
-async upsertStudent(student) {}
+All methods are `async`.
 
-/**
- * Fetch a student record for a guild and Discord user.
- *
- * @param {string} discordGuildId
- * @param {string} discordUserId
- * @returns {Promise<Student|null>}
- */
-async getStudent(discordGuildId, discordUserId) {}
+```python
+class DatabaseService(Protocol):
+    async def upsert_student(self, student: Student) -> Student:
+        """Insert or update a student by Discord guild and user identity.
+        Raises ValueError if identifiers are missing; persistence errors propagate."""
 
-/**
- * Save or replace a student's schedule.
- *
- * @param {StudentSchedule} schedule
- * @returns {Promise<StudentSchedule>}
- */
-async saveSchedule(schedule) {}
+    async def get_student(self, discord_guild_id: str, discord_user_id: str) -> Student | None: ...
 
-/**
- * Fetch a student's schedule scoped by guild and Discord user.
- *
- * @param {string} discordGuildId
- * @param {string} discordUserId
- * @returns {Promise<StudentSchedule|null>}
- */
-async getStudentSchedule(discordGuildId, discordUserId) {}
+    async def save_schedule(self, schedule: StudentSchedule) -> StudentSchedule:
+        """Save or replace a student's schedule."""
 
-/**
- * Fetch schedules for multiple students within a guild.
- *
- * @param {string} discordGuildId
- * @param {string[]} discordUserIds
- * @returns {Promise<StudentSchedule[]>}
- */
-async getSchedulesForUsers(discordGuildId, discordUserIds) {}
+    async def get_student_schedule(self, discord_guild_id: str, discord_user_id: str) -> StudentSchedule | None: ...
 
-/**
- * Delete a student's schedule record.
- *
- * @param {string} discordGuildId
- * @param {string} discordUserId
- * @returns {Promise<boolean>}
- */
-async deleteStudentSchedule(discordGuildId, discordUserId) {}
+    async def get_schedules_for_users(
+        self, discord_guild_id: str, discord_user_ids: list[str]
+    ) -> list[StudentSchedule]: ...
 
-/**
- * Save or update a student's commute preferences.
- *
- * @param {CommutePreferences} preferences
- * @returns {Promise<CommutePreferences>}
- */
-async saveCommutePreferences(preferences) {}
+    async def delete_student_schedule(self, discord_guild_id: str, discord_user_id: str) -> bool: ...
 
-/**
- * Fetch commute preferences for a student within a guild.
- *
- * @param {string} discordGuildId
- * @param {string} discordUserId
- * @returns {Promise<CommutePreferences|null>}
- */
-async getCommutePreferences(discordGuildId, discordUserId) {}
+    async def save_commute_preferences(self, preferences: CommutePreferences) -> CommutePreferences: ...
 
-/**
- * Create a ride request.
- *
- * @param {RideRequest} request
- * @returns {Promise<RideRequest>}
- */
-async createRideRequest(request) {}
+    async def get_commute_preferences(
+        self, discord_guild_id: str, discord_user_id: str
+    ) -> CommutePreferences | None: ...
 
-/**
- * Return all active ride requests in a guild.
- *
- * @param {string} discordGuildId
- * @returns {Promise<RideRequest[]>}
- */
-async getOpenRideRequests(discordGuildId) {}
+    async def create_ride_request(self, request: RideRequest) -> RideRequest: ...
 
-/**
- * Update the status of a ride request.
- *
- * @param {string} requestId
- * @param {'open'|'matched'|'cancelled'|'completed'} status
- * @returns {Promise<RideRequest|null>}
- */
-async updateRideRequestStatus(requestId, status) {}
+    async def get_open_ride_requests(self, discord_guild_id: str) -> list[RideRequest]:
+        """Return all active ride requests in a guild."""
+
+    async def update_ride_request_status(
+        self, request_id: str, status: RideRequestStatus
+    ) -> RideRequest | None: ...
 ```
 
 ### Error behavior
 
-- All methods should reject with an Error when required data is missing.
+- All methods should raise an exception (`ValueError`) when required data is missing.
 - Guild-scoped queries must never cross Discord guild boundaries.
-- When a record is not found, methods should return null or an empty array depending on the API contract.
+- When a record is not found, methods return `None` or an empty list depending on the API contract.
 - Unexpected persistence errors should be surfaced to the caller without leaking secrets.
 
 ## AgentService
 
 The AgentService contract is implemented by the LangChain developer and used by the Discord developer. The service is responsible for interpreting user messages, multi-modal schedule extraction, and generating Discord-friendly outputs.
 
-```js
-/**
- * @typedef {Object} ProcessMessageContext
- * @property {string} message
- * @property {string} discordUserId
- * @property {string} discordGuildId
- * @property {string} channelId
- * @property {string[]} mentionedUserIds
- */
-
-/**
- * @typedef {Object} AgentResponse
- * @property {string} responseText
- * @property {Object} [metadata]
- */
-
-/**
- * @typedef {Object} ScheduleExtractionResult
- * @property {Object} extractedSchedule
- * @property {string[]} validationWarnings
- * @property {boolean} confirmationRequired
- */
-```
+Models: `ProcessMessageContext`, `AgentResponse`, `ScheduleExtractionResult` (see `contracts.py`).
 
 ### Required methods
 
-```js
-/**
- * Process a Discord message and determine the best response.
- *
- * @param {ProcessMessageContext} context
- * @returns {Promise<AgentResponse>}
- */
-async processMessage(context) {}
+```python
+class AgentService(Protocol):
+    async def process_message(self, context: ProcessMessageContext) -> AgentResponse:
+        """Process a Discord message and determine the best response."""
 
-/**
- * Extract a schedule from an uploaded image.
- *
- * @param {Buffer|string} imageInput
- * @param {string} mimeType
- * @param {string} discordUserId
- * @param {string} discordGuildId
- * @returns {Promise<ScheduleExtractionResult>}
- */
-async extractScheduleFromImage(imageInput, mimeType, discordUserId, discordGuildId) {}
+    async def extract_schedule_from_image(
+        self,
+        image_input: bytes | str,
+        mime_type: str,
+        discord_user_id: str,
+        discord_guild_id: str,
+    ) -> ScheduleExtractionResult:
+        """Extract a schedule from an uploaded image."""
 ```
 
 ### Contract requirements
 
-- processMessage receives a message string and metadata from Discord.
+- `process_message` receives a message string and metadata from Discord.
 - The response must contain text suitable for Discord display.
 - The agent must not automatically persist unconfirmed schedules.
 - Agent logic must not directly access Discord for bot lifecycle tasks.

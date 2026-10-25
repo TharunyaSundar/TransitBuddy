@@ -28,7 +28,7 @@ Transit Buddy combines a Discord interface, a MongoDB-backed data layer, and a L
 ### Implemented in the foundation
 
 - Project scaffolding and modular directory structure
-- Shared JSDoc contracts for communication between teams
+- Shared Pydantic contracts for communication between teams
 - Environment configuration handling
 - Documentation for responsibilities and integration contracts
 - Initialization-only application entry point
@@ -36,18 +36,18 @@ Transit Buddy combines a Discord interface, a MongoDB-backed data layer, and a L
 ## Technology Stack
 
 - JavaScript: primary language for all modules and scripts.
-- Node.js: runtime environment for the bot and project scripts.
-- discord.js: Discord client, command handling, and bot interactions.
+- Python 3.11+: runtime environment for the bot and project scripts.
+- discord.py: Discord client, command handling, and bot interactions.
 - MongoDB Atlas: cloud database for student, schedule, commute, and ride data.
-- Mongoose: schema validation and model definitions for persisted documents.
-- LangChain.js: orchestration for agent behavior and multimodal processing workflows.
-- dotenv: environment variable management for local configuration.
+- PyMongo + Pydantic: MongoDB access and schema validation for persisted documents.
+- LangChain (Python): orchestration for agent behavior and multimodal processing workflows.
+- python-dotenv: environment variable management for local configuration.
 
 ## System Architecture
 
 ```mermaid
 flowchart LR
-    A[Discord Users] --> B[Discord.js]
+    A[Discord Users] --> B[discord.py]
     B --> C[LangChain Agent]
     C --> D[Skills / Tools]
     C --> E[MongoDB]
@@ -58,14 +58,14 @@ flowchart LR
 
 ## Folder Structure
 
-- src/index.js: application startup entry point.
-- src/config/env.js: environment configuration loader.
-- src/discord/: developer-owned Discord integration layer.
-- src/database/: developer-owned MongoDB models, repositories, and services.
-- src/agent/: developer-owned LangChain agent and LLM workflow code.
-- src/skills/: Markdown skill templates for the agent.
-- src/shared/: cross-team contracts, constants, and validators.
-- src/utils/: utility modules such as logging.
+- transit_buddy/__main__.py: application startup entry point (`python -m transit_buddy`).
+- transit_buddy/config/: environment configuration loader.
+- transit_buddy/discord_bot/: developer-owned Discord integration layer (named to avoid shadowing the `discord` library).
+- transit_buddy/database/: developer-owned MongoDB models, repositories, and services.
+- transit_buddy/agent/: developer-owned LangChain agent and LLM workflow code.
+- transit_buddy/skills/: Markdown skill templates for the agent.
+- transit_buddy/shared/: cross-team contracts, constants, and validators.
+- transit_buddy/utils/: utility modules such as logging.
 - docs/: architecture, responsibilities, development guide, and integration contracts.
 - tests/: test scaffolding for the three contributors.
 - scripts/: command registration and demo data setup scripts.
@@ -74,9 +74,9 @@ flowchart LR
 
 | Developer | Module | Branch | Responsibilities | Deliverables |
 | --- | --- | --- | --- | --- |
-| Developer 1 | src/discord/, tests/discord/ | feature/discord-bot | Build Discord app setup, command registration, mentions, screenshot handling, confirmation flows, and message forwarding to the agent. | Discord bot client, slash commands, handlers, tests |
-| Developer 2 | src/database/, tests/database/ | feature/mongodb | Create MongoDB Atlas, Mongoose schemas, repositories, validation, schedule storage, and demo data. | Database models, services, seed script, tests |
-| Developer 3 | src/agent/, src/skills/, tests/agent/ | feature/langchain-agent | Configure LangChain, multimodal extraction, skill files, matching logic, and response generation. | Agent service, skills, extraction logic, tests |
+| Developer 1 | transit_buddy/discord_bot/, tests/discord/ | feature/discord-bot | Build Discord app setup, command registration, mentions, screenshot handling, confirmation flows, and message forwarding to the agent. | Discord bot client, slash commands, handlers, tests |
+| Developer 2 | transit_buddy/database/, tests/database/ | feature/mongodb | Create MongoDB Atlas, Pydantic/PyMongo models, repositories, validation, schedule storage, and demo data. | Database models, services, seed script, tests |
+| Developer 3 | transit_buddy/agent/, transit_buddy/skills/, tests/agent/ | feature/langchain-agent | Configure LangChain, multimodal extraction, skill files, matching logic, and response generation. | Agent service, skills, extraction logic, tests |
 
 ## Git Branching Strategy
 
@@ -103,7 +103,9 @@ cd transit-buddy
 ### Install dependencies
 
 ```bash
-npm install
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ### Create environment file
@@ -117,13 +119,13 @@ Then fill in the required values when the relevant service is actually being use
 ### Start the application
 
 ```bash
-npm start
+python -m transit_buddy
 ```
 
-For development mode:
+Run tests:
 
 ```bash
-npm run dev
+pytest
 ```
 
 ## Discord Setup
