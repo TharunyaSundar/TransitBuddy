@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Transit Buddy</title>
+<meta name="description" content="Transit Buddy is a Discord bot that helps ASU Tempe students agree on when to leave for campus and head home, from their class schedules.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+[hidden] { display: none !important; }
+/* Layout concept: a transit-line page. One route line runs from the hero stop to the
+   final CTA; each section is a stop on it. Signage type (Archivo, condensed/expanded) over a deep indigo night. */
+:root {
+  --bg: #0b0d26;
+  --bg2: #11143a;
+  --card: #161a47;
+  --line: #2c3170;
+  --fg: #eceeff;
+  --mute: #a3a9de;
+  --accent: #4fd1ff;      /* route cyan */
+  --on-accent: #06081f;
+  --accent2: #ff9a4d;     /* Tempe sun */
+  --blurple: #6d73ff;
+  --ok: #5be3a4;
+  --bubble: #1d2158;
+  --font-display: "Archivo", "Arial Narrow", Arial, sans-serif;
+  --font-body: "Figtree", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --gap: clamp(72px, 10vw, 128px);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f4f5fd; --bg2: #e9ebfa; --card: #ffffff; --line: #c9cdee; --fg: #12153a; --mute: #4b5090;
+    --accent: #0a7fb0; --on-accent: #ffffff; --accent2: #b84a05; --blurple: #4a50e0; --ok: #0b7a50; --bubble: #eef0ff;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f4f5fd; --bg2: #e9ebfa; --card: #ffffff; --line: #c9cdee; --fg: #12153a; --mute: #4b5090;
+  --accent: #0a7fb0; --on-accent: #ffffff; --accent2: #b84a05; --blurple: #4a50e0; --ok: #0b7a50; --bubble: #eef0ff;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 400 17px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  overflow-x: hidden;
+}
+.wrap { max-width: 1120px; margin-inline: auto; padding-inline: 0; }
+section { padding-block: var(--gap) 0; }
+h1, h2, h3 { font-family: var(--font-display); font-stretch: 100%; margin: 0; text-wrap: balance; line-height: 1.02; letter-spacing: -0.01em; }
+h2 { font-size: clamp(30px, 5vw, 52px); font-weight: 800; font-stretch: 88%; text-transform: uppercase; }
+p { margin: 0; }
+.mono { font-family: var(--font-mono); }
+.eyebrow { font: 500 12px/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.eyebrow::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--accent); background: var(--bg); flex: none; }
+.lede { color: var(--mute); max-width: 56ch; margin-top: 18px; font-size: 18px; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--accent2); outline-offset: 3px; border-radius: 6px; }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; gap: 10px; font: 700 16px/1 var(--font-display); font-stretch: 95%; letter-spacing: .02em; text-transform: uppercase;
+  padding: 16px 24px; border-radius: 999px; text-decoration: none; border: 2px solid transparent; cursor: pointer; transition: transform .15s ease, background .15s ease; }
+.btn-primary { background: var(--accent); color: var(--on-accent); }
+.btn-primary:hover { transform: translateY(-2px); }
+.btn-ghost { border-color: var(--line); color: var(--fg); background: transparent; }
+.btn-ghost:hover { border-color: var(--accent); }
+.btn svg { width: 22px; height: 22px; flex: none; }
+
+/* nav */
+nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 22px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 800 20px/1 var(--font-display); font-stretch: 90%; text-transform: uppercase; text-decoration: none; }
+.brand i { width: 30px; height: 30px; border-radius: 9px; background: var(--accent); display: grid; place-items: center; }
+.brand i::after { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--on-accent); }
+nav .links { display: flex; gap: 22px; align-items: center; font-weight: 500; }
+nav .links a { text-decoration: none; color: var(--mute); }
+nav .links a:hover { color: var(--fg); }
+@media (max-width: 720px) { nav .links a:not(.btn) { display: none; } }
+
+/* hero */
+.hero { padding-top: clamp(24px, 6vw, 72px); }
+.hero h1 { font-size: clamp(44px, 9.2vw, 120px); font-weight: 900; font-stretch: 72%; text-transform: uppercase; max-width: 12ch; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero .lede { font-size: clamp(18px, 2vw, 21px); max-width: 52ch; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 30px; }
+.route { margin-top: clamp(36px, 6vw, 64px); width: 100%; height: auto; display: block; }
+.route .track { stroke: var(--line); stroke-width: 6; fill: none; stroke-linecap: round; }
+.route .live { stroke: var(--accent); stroke-width: 6; fill: none; stroke-linecap: round; stroke-dasharray: 8 14; animation: flow 1.6s linear infinite; }
+.route .stop { fill: var(--bg); stroke: var(--accent); stroke-width: 5; }
+.route .stop.end { stroke: var(--accent2); }
+.route text { font: 500 13px var(--font-mono); fill: var(--mute); letter-spacing: .06em; text-transform: uppercase; }
+@keyframes flow { to { stroke-dashoffset: -44; } }
+
+/* demo */
+.demo { display: grid; grid-template-columns: minmax(0, 330px) minmax(0, 1fr); gap: 28px; margin-top: 44px; align-items: start; }
+@media (max-width: 860px) { .demo { grid-template-columns: minmax(0, 1fr); } }
+.cmds { display: flex; flex-direction: column; gap: 8px; }
+.cmd { text-align: left; background: transparent; border: 1.5px solid var(--line); color: var(--fg); border-radius: 14px; padding: 14px 16px; cursor: pointer; font: inherit; transition: border-color .15s, background .15s; }
+.cmd b { display: block; font: 500 15px var(--font-mono); color: var(--accent); }
+.cmd span { color: var(--mute); font-size: 14px; line-height: 1.35; display: block; margin-top: 4px; }
+.cmd:hover { border-color: var(--accent); }
+.cmd[aria-selected="true"] { background: var(--card); border-color: var(--accent); }
+@media (max-width: 860px) { .cmds { flex-direction: row; overflow-x: auto; padding-bottom: 6px; } .cmd { flex: 0 0 auto; min-width: 200px; } }
+.chat { background: var(--card); border: 1.5px solid var(--line); border-radius: 18px; overflow: hidden; min-width: 0; }
+.chat-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1.5px solid var(--line); font-weight: 600; }
+.chat-head .hash { color: var(--mute); font: 500 20px var(--font-mono); }
+.chat-body { padding: 18px; min-height: 430px; display: flex; flex-direction: column; gap: 18px; }
+.msg { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; animation: pop .35s ease both; }
+.av { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 800 16px var(--font-display); color: #fff; }
+.who { font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tag { font: 600 10px var(--font-mono); letter-spacing: .08em; background: var(--blurple); color: #fff; padding: 3px 6px; border-radius: 4px; }
+.slash { font: 500 15px var(--font-mono); color: var(--mute); }
+.slash b { color: var(--accent); font-weight: 500; }
+.bubble { margin-top: 6px; background: var(--bubble); border-radius: 4px 14px 14px 14px; padding: 12px 14px; font-size: 15.5px; overflow-wrap: anywhere; }
+.bubble ul { margin: 8px 0 0; padding-left: 18px; }
+.bubble li { margin: 3px 0; }
+.bubble .row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 6px 0; border-top: 1px dashed var(--line); font-size: 15px; }
+.bubble .row:first-of-type { border-top: 0; }
+.time { font-family: var(--font-mono); color: var(--accent2); }
+.only { font-size: 12.5px; color: var(--mute); margin-top: 6px; display: flex; gap: 6px; align-items: center; }
+.btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.dbtn { font: 600 14px var(--font-body); border: 0; padding: 9px 16px; border-radius: 8px; cursor: pointer; }
+.dbtn.ok { background: #2f9e62; color: #fff; }
+.dbtn.no { background: #4a4f86; color: #fff; }
+.dbtn:disabled { opacity: .5; cursor: default; }
+.typing { display: inline-flex; gap: 4px; padding: 6px 2px; }
+.typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--mute); animation: blink 1s infinite; }
+.typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.replay { margin: 0 18px 18px; align-self: flex-start; }
+
+/* leave planner */
+.panel { background: var(--card); border: 1.5px solid var(--line); border-radius: 20px; padding: clamp(18px, 3vw, 32px); margin-top: 40px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: center; margin-bottom: 22px; }
+.seg { display: inline-flex; border: 1.5px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; color: var(--mute); font: 600 14px var(--font-body); padding: 8px 16px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid var(--line); background: transparent; color: var(--fg); border-radius: 999px; padding: 7px 14px 7px 8px; font: 500 14px var(--font-body); cursor: pointer; }
+.chip i { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 800 12px var(--font-display); font-style: normal; }
+.chip[aria-pressed="false"] { opacity: .45; }
+.chip[aria-pressed="true"] { border-color: var(--accent); }
+.chip[disabled] { opacity: .3; cursor: default; }
+.lbl { font: 500 12px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+.gantt { position: relative; overflow-x: auto; }
+.gantt-inner { position: relative; min-width: 560px; }
+.hours { display: grid; grid-template-columns: 96px 1fr; font: 500 11px var(--font-mono); color: var(--mute); }
+.hours div:last-child { display: flex; justify-content: space-between; }
+.grow { display: grid; grid-template-columns: 96px 1fr; align-items: center; height: 46px; }
+.grow .name { font-weight: 600; font-size: 14.5px; }
+.lane { position: relative; height: 26px; background: repeating-linear-gradient(90deg, transparent 0 calc(12.5% - 1px), var(--line) calc(12.5% - 1px) 12.5%); border-radius: 6px; }
+.blk { position: absolute; top: 3px; bottom: 3px; border-radius: 6px; opacity: .92; display: grid; place-items: center; font: 500 10.5px var(--font-mono); color: #fff; overflow: hidden; white-space: nowrap; }
+.free { position: absolute; top: 0; bottom: 0; border-radius: 6px; border: 1.5px dashed var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.nocls { color: var(--mute); font-size: 13px; padding-left: 10px; line-height: 26px; }
+.lineWrap { position: absolute; left: 96px; right: 0; top: 18px; bottom: 0; pointer-events: none; }
+.leave { position: absolute; top: 0; bottom: 0; width: 0; border-left: 3px solid var(--accent2); transition: left .35s ease; }
+.leave b { position: absolute; top: -26px; transform: translateX(-50%); background: var(--accent2); color: #1a0d00; font: 600 12px var(--font-mono); padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.verdict { margin-top: 22px; display: grid; gap: 4px; }
+.verdict strong { font: 800 clamp(26px, 4vw, 40px)/1.05 var(--font-display); font-stretch: 85%; text-transform: uppercase; }
+.verdict span { color: var(--mute); }
+
+/* privacy */
+.priv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; margin-top: 40px; }
+@media (max-width: 860px) { .priv { grid-template-columns: minmax(0, 1fr); } }
+.switch { display: flex; align-items: center; gap: 14px; font-weight: 600; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; }
+.switch .tr { width: 52px; height: 30px; border-radius: 999px; background: var(--line); position: relative; flex: none; transition: background .2s; }
+.switch .tr::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.switch input:checked + .tr { background: var(--ok); }
+.switch input:checked + .tr::after { transform: translateX(22px); }
+.switch input:focus-visible + .tr { outline: 3px solid var(--accent2); outline-offset: 3px; }
+.profile { background: var(--bubble); border-radius: 14px; padding: 18px; margin-top: 18px; display: grid; gap: 0; }
+.profile .row { display: flex; justify-content: space-between; gap: 14px; padding: 11px 0; border-top: 1px dashed var(--line); font-size: 15.5px; }
+.profile .row:first-child { border-top: 0; }
+.profile .row span:first-child { color: var(--mute); }
+.pill { font: 600 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; }
+.pill.hide { background: color-mix(in srgb, var(--accent2) 22%, transparent); color: var(--accent2); }
+.pill.show { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
+.facts { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.facts li { padding: 16px 18px; border: 1.5px solid var(--line); border-radius: 14px; }
+.facts b { display: block; font: 700 18px var(--font-display); font-stretch: 92%; margin-bottom: 4px; }
+.facts span { color: var(--mute); font-size: 15.5px; }
+
+/* how */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 44px; position: relative; }
+.steps::before { content: ""; position: absolute; left: 0; right: 0; top: 13px; height: 6px; background: var(--line); border-radius: 3px; }
+@media (max-width: 760px) { .steps { grid-template-columns: minmax(0, 1fr); gap: 30px; } .steps::before { left: 13px; right: auto; top: 0; bottom: 0; width: 6px; height: auto; } }
+.step { position: relative; padding: 38px 24px 0 0; }
+.step::before { content: ""; position: absolute; top: 0; left: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--bg); border: 6px solid var(--accent); }
+@media (max-width: 760px) { .step { padding: 0 0 0 52px; } }
+.step h3 { font-size: 22px; font-weight: 800; font-stretch: 90%; text-transform: uppercase; margin-bottom: 8px; }
+.step p { color: var(--mute); font-size: 16px; }
+
+/* cta */
+.cta { text-align: center; padding-bottom: var(--gap); }
+.cta h2 { font-size: clamp(36px, 7vw, 84px); font-stretch: 72%; font-weight: 900; max-width: 14ch; margin-inline: auto; }
+.cta .lede { margin-inline: auto; }
+.cta .cta-row { justify-content: center; }
+.invite { margin: 28px auto 0; max-width: 720px; display: flex; gap: 8px; align-items: center; background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 8px 8px 8px 16px; }
+.invite code { font: 400 12.5px var(--font-mono); color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; text-align: left; min-width: 0; }
+.invite button { flex: none; }
+footer { border-top: 1.5px solid var(--line); padding-block: 28px 40px; color: var(--mute); font-size: 14.5px; display: flex; flex-wrap: wrap; gap: 12px 28px; justify-content: space-between; }
+footer a { color: var(--fg); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="#top"><i aria-hidden="true"></i>Transit Buddy</a>
+    <div class="links">
+      <a href="#demo">Try it</a>
+      <a href="#leave">Leave times</a>
+      <a href="#privacy">Privacy</a>
+      <a class="btn btn-primary" data-invite href="#" target="_blank" rel="noopener">Add to Discord</a>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="eyebrow">Discord bot for ASU Tempe</div>
+    <h1>Same class. Same bus. <em>Same ride.</em></h1>
+    <p class="lede">Transit Buddy reads your class schedule from a screenshot, then helps you and your classmates agree on when to leave for campus and when to head home. It is a bot in your own Discord server.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" data-invite href="#" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Add to Discord
+      </a>
+      <a class="btn btn-ghost" href="#demo">Try the commands</a>
+    </div>
+    <svg class="route" viewBox="0 0 1100 150" role="img" aria-label="A route from Tempe Village through Apache Boulevard and Mill Avenue to ASU Tempe campus">
+      <path class="track" d="M30 100 C 200 100, 220 40, 380 40 S 600 110, 760 110 S 930 50, 1070 50"/>
+      <path class="live" d="M30 100 C 200 100, 220 40, 380 40 S 600 110, 760 110 S 930 50, 1070 50"/>
+      <circle class="stop" cx="30" cy="100" r="13"/><text x="14" y="138">Tempe Village</text>
+      <circle class="stop" cx="380" cy="40" r="13"/><text x="330" y="20">Apache Blvd</text>
+      <circle class="stop" cx="760" cy="110" r="13"/><text x="716" y="142">Mill Ave</text>
+      <circle class="stop end" cx="1070" cy="50" r="13"/><text x="968" y="92">ASU Tempe</text>
+    </svg>
+  </header>
+
+  <section id="demo">
+    <div class="eyebrow">Live demo</div>
+    <h2>Pick a command</h2>
+    <p class="lede">These are the real slash commands. The conversation below is a simulation with made-up students, and the buttons work.</p>
+    <div class="demo">
+      <div class="cmds" role="tablist" aria-label="Commands" id="cmds"></div>
+      <div class="chat">
+        <div class="chat-head"><span class="hash">#</span> commute-crew</div>
+        <div class="chat-body" id="chat" aria-live="polite"></div>
+        <button class="btn btn-ghost replay" id="replay" type="button" style="padding:10px 18px;font-size:13px">Replay</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="leave">
+    <div class="eyebrow">Leave times</div>
+    <h2>Class ends is not leave time</h2>
+    <p class="lede">A class that ends at 10:15 does not mean everyone is walking out at 10:15. Pick a day and who is coming along. The bar shows when the whole group is actually free.</p>
+    <div class="panel">
+      <div class="controls">
+        <div><div class="lbl" style="margin-bottom:8px">Day</div>
+          <div class="seg" id="days" role="group" aria-label="Day"></div></div>
+        <div><div class="lbl" style="margin-bottom:8px">Who is going</div>
+          <div class="chips" id="people"></div></div>
+        <div><div class="lbl" style="margin-bottom:8px">Pack-up buffer</div>
+          <div class="seg" id="buffer" role="group" aria-label="Buffer"></div></div>
+      </div>
+      <div class="gantt"><div class="gantt-inner" id="gantt"></div></div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+  </section>
+
+  <section id="privacy">
+    <div class="eyebrow">Privacy</div>
+    <h2>Your address stays yours</h2>
+    <p class="lede">Matching is opt-in. Flip the switch to see exactly what a classmate gets when they run <span class="mono">/commute match</span>.</p>
+    <div class="priv">
+      <div class="panel" style="margin-top:0">
+        <label class="switch"><input type="checkbox" id="optin" checked><span class="tr"></span>Match me with other students</label>
+        <div class="profile" id="profile"></div>
+        <div class="btns"><button class="dbtn no" id="forget" type="button">/commute forget-address</button></div>
+        <p class="only" id="forgetNote" style="margin-top:12px"></p>
+      </div>
+      <ul class="facts">
+        <li><b>Private setup form</b><span>/commute setup opens a form only you can see. Replies to your commands are private too.</span></li>
+        <li><b>Area, not address</b><span>Classmates see a general area and an approximate time window. Your home address is only used for your own trip times.</span></li>
+        <li><b>Nothing saved without a yes</b><span>A schedule screenshot is shown to you first. It is saved only when you press Confirm.</span></li>
+        <li><b>Delete any time</b><span>/commute forget-address removes your commute profile, including the address.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="eyebrow">How it works</div>
+    <h2>Three stops</h2>
+    <div class="steps">
+      <div class="step"><h3>Add the bot</h3><p>Invite Transit Buddy to your server. Run /commute setup once to save your area, usual departure time and whether you want matches.</p></div>
+      <div class="step"><h3>Upload a screenshot</h3><p>/schedule upload reads your classes from an image. You check them and press Confirm. Nothing is saved before that.</p></div>
+      <div class="step"><h3>Agree on a time</h3><p>/commute availability, /commute match and /commute plan turn everyone's classes into one departure time to propose.</p></div>
+    </div>
+  </section>
+
+  <section class="cta" id="add">
+    <h2>Next stop: your server</h2>
+    <p class="lede">Free to add. You can remove the bot from your server whenever you like.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" data-invite href="#" target="_blank" rel="noopener">Add to Discord</a>
+      <a class="btn btn-ghost" href="https://github.com/TharunyaSundar/TransitBuddy" target="_blank" rel="noopener">View the code</a>
+    </div>
+    <div class="invite"><code id="inviteText"></code><button class="btn btn-ghost" id="copy" type="button" style="padding:11px 18px;font-size:13px">Copy link</button></div>
+  </section>
+
+  <footer>
+    <span>Transit Buddy is a hackathon project for ASU Tempe students. Students and schedules in this demo are made up.</span>
+    <a href="https://github.com/TharunyaSundar/TransitBuddy" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var INVITE = "https://discord.com/oauth2/authorize?client_id=1563757020832858132&scope=bot%20applications.commands&permissions=68608";
+  document.querySelectorAll("[data-invite]").forEach(function (a) { a.href = INVITE; });
+  document.getElementById("inviteText").textContent = INVITE;
+  document.getElementById("copy").addEventListener("click", function () {
+    var b = this;
+    function done(t) { b.textContent = t; setTimeout(function () { b.textContent = "Copy link"; }, 1800); }
+    try { navigator.clipboard.writeText(INVITE).then(function () { done("Copied"); }, function () { done("Select the link"); }); }
+    catch (e) { done("Select the link"); }
+  });
+
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var COLORS = { Maya: "#7a5cff", Jordan: "#e0577a", Sam: "#1f9d8b", Priya: "#d98a1e", You: "#4f6bff" };
+  function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+
+  /* ---------- chat demo ---------- */
+  var chat = document.getElementById("chat"), cmdBox = document.getElementById("cmds");
+  var CMDS = [
+    { id: "upload", cmd: "/schedule upload", d: "Screenshot in, classes out. You confirm before anything is saved." },
+    { id: "avail", cmd: "/commute availability", d: "When you and classmates need to be on campus and are free." },
+    { id: "match", cmd: "/commute match", d: "Opted-in students from your area with similar times." },
+    { id: "plan", cmd: "/commute plan", d: "One departure time proposed for the whole group." },
+    { id: "ask", cmd: "/ask", d: "Ask in plain words about schedules and commutes." }
+  ];
+  var timers = [], current = "upload";
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+  function later(fn, ms) { timers.push(setTimeout(fn, reduce ? 0 : ms)); }
+  function userMsg(who, slashHtml) {
+    var m = el("div", "msg");
+    m.appendChild(el("div", "av", who[0])).style.background = COLORS[who] || COLORS.You;
+    var r = el("div"); r.appendChild(el("div", "who", who));
+    r.appendChild(el("div", "slash", slashHtml)); m.appendChild(r); chat.appendChild(m); return m;
+  }
+  function botMsg(html, extra) {
+    var m = el("div", "msg");
+    var av = el("div", "av", "TB"); av.style.background = "var(--accent)"; av.style.color = "var(--on-accent)"; av.style.fontSize = "13px";
+    m.appendChild(av);
+    var r = el("div"); r.appendChild(el("div", "who", 'Transit Buddy <span class="tag">APP</span>'));
+    var b = el("div", "bubble", html); r.appendChild(b);
+    r.appendChild(el("div", "only", "Only you can see this"));
+    if (extra) extra(r, b);
+    m.appendChild(r); chat.appendChild(m); return m;
+  }
+  function typingThen(fn, ms) {
+    var t = botMsg('<span class="typing"><i></i><i></i><i></i></span>');
+    later(function () { t.remove(); fn(); }, ms || 900);
+  }
+  var SCRIPTS = {
+    upload: function () {
+      userMsg("You", '<b>/schedule upload</b> image: <span class="mono">fall-2026.png</span>');
+      typingThen(function () {
+        botMsg("Here's what I read from your screenshot:<ul><li><b>CSE 565</b> Software Verification<br><span class='time'>Mon Wed 09:00-10:15</span> BYENG 210</li><li><b>CSE 572</b> Data Mining<br><span class='time'>Mon Wed 13:30-14:45</span> GWC 487</li></ul><p style='margin-top:10px;color:var(--mute)'>Semester: Fall 2026. Press Confirm to save it, or Cancel to discard it.</p>", function (r, b) {
+          var row = el("div", "btns"), ok = el("button", "dbtn ok", "Confirm"), no = el("button", "dbtn no", "Cancel");
+          ok.type = no.type = "button";
+          function finish(msg) { ok.disabled = no.disabled = true; typingThen(function () { botMsg(msg); }, 500); }
+          ok.onclick = function () { finish("Saved your schedule. Use <span class='mono'>/schedule view</span> to see it."); };
+          no.onclick = function () { finish("Not saved. Upload it again any time with <span class='mono'>/schedule upload</span>."); };
+          row.appendChild(ok); row.appendChild(no); b.appendChild(row);
+        });
+      }, 1300);
+    },
+    avail: function () {
+      userMsg("You", "<b>/commute availability</b> day: <span class='mono'>Monday</span> with: <span class='mono'>@Jordan</span>");
+      typingThen(function () {
+        botMsg("<div class='row'><span>You</span><span class='time'>on campus 08:45, free from 15:00</span></div><div class='row'><span>Jordan</span><span class='time'>on campus 08:45, free from 10:25</span></div><p style='margin-top:10px;color:var(--mute)'>Jordan's last class ends well before yours. A class ending is not the same as leaving, so I left 10 minutes to pack up.</p>");
+      });
+    },
+    match: function () {
+      userMsg("You", "<b>/commute match</b>");
+      typingThen(function () {
+        botMsg("Opted-in students from your area with similar times:<div style='margin-top:8px'><div class='row'><span><b>Jordan</b> · Tempe Village</span><span class='time'>leaves 08:00-08:30</span></div><div class='row'><span><b>Priya</b> · Mesa</span><span class='time'>leaves 08:30-09:00</span></div></div><p style='margin-top:10px;color:var(--mute)'>Only students who chose to be matched appear here, and only by area.</p>");
+      });
+    },
+    plan: function () {
+      userMsg("You", "<b>/commute plan</b> with: <span class='mono'>@Jordan @Priya</span>");
+      typingThen(function () {
+        botMsg("Proposed plan for Monday:<div style='margin-top:8px'><div class='row'><span>Leave for campus</span><span class='time'>08:20</span></div><div class='row'><span>Leave campus</span><span class='time'>15:00</span></div></div><p style='margin-top:10px;color:var(--mute)'>Everyone is free by 14:55 on Monday. Reply to this thread if the time does not work for you.</p>");
+      }, 1100);
+    },
+    ask: function () {
+      userMsg("You", "<b>/ask</b> question: <span class='mono'>who else has a 9 AM on Mondays?</span>");
+      typingThen(function () {
+        botMsg("Two people in this server have a 9:00 AM class on Mondays: <b>Maya</b> (CSE 565) and <b>Jordan</b> (CSE 551). Want me to check if you can leave together?");
+      }, 1200);
+    }
+  };
+  function run(id) {
+    current = id; clearTimers(); chat.innerHTML = "";
+    Array.prototype.forEach.call(cmdBox.children, function (c) { c.setAttribute("aria-selected", c.dataset.id === id ? "true" : "false"); });
+    SCRIPTS[id]();
+  }
+  CMDS.forEach(function (c) {
+    var b = el("button", "cmd", "<b>" + c.cmd + "</b><span>" + c.d + "</span>");
+    b.type = "button"; b.dataset.id = c.id; b.setAttribute("role", "tab");
+    b.addEventListener("click", function () { run(c.id); });
+    cmdBox.appendChild(b);
+  });
+  document.getElementById("replay").addEventListener("click", function () { run(current); });
+  run("upload");
+
+  /* ---------- leave-time planner ---------- */
+  var DAYS = ["Mon", "Tue"], START = 8 * 60, END = 16 * 60;
+  var P = {
+    Maya:   { Mon: [[540, 615, "CSE 565"], [810, 885, "CSE 572"]], Tue: [] },
+    Jordan: { Mon: [[540, 615, "CSE 551"]], Tue: [[630, 705, "EEE 598"]] },
+    Sam:    { Mon: [], Tue: [[540, 615, "CSE 578"]] },
+    Priya:  { Mon: [[630, 705, "CSE 475"]], Tue: [] }
+  };
+  var state = { day: "Mon", buf: 10, who: { Maya: true, Jordan: true, Sam: true, Priya: true } };
+  function fmt(m) { var h = Math.floor(m / 60), mm = m % 60; return (h < 10 ? "0" : "") + h + ":" + (mm < 10 ? "0" : "") + mm; }
+  function pct(m) { return ((m - START) / (END - START)) * 100; }
+  function seg(host, items, key, label) {
+    host.innerHTML = "";
+    items.forEach(function (it) {
+      var b = el("button", null, it.label); b.type = "button";
+      b.setAttribute("aria-pressed", String(state[key] === it.value));
+      b.addEventListener("click", function () { state[key] = it.value; render(); });
+      host.appendChild(b);
+    });
+  }
+  function render() {
+    seg(document.getElementById("days"), DAYS.map(function (d) { return { label: d, value: d }; }), "day");
+    seg(document.getElementById("buffer"), [0, 10, 20].map(function (n) { return { label: n + " min", value: n }; }), "buf");
+    var people = document.getElementById("people"); people.innerHTML = "";
+    Object.keys(P).forEach(function (n) {
+      var has = P[n][state.day].length > 0;
+      var c = el("button", "chip", "<i style='background:" + COLORS[n] + "'>" + n[0] + "</i>" + n); c.type = "button";
+      if (!has) { c.disabled = true; c.setAttribute("aria-pressed", "false"); c.title = "No class this day"; }
+      else { c.setAttribute("aria-pressed", String(state.who[n])); c.addEventListener("click", function () { state.who[n] = !state.who[n]; render(); }); }
+      people.appendChild(c);
+    });
+    var g = document.getElementById("gantt"); g.innerHTML = "";
+    var hrs = el("div", "hours"); hrs.appendChild(el("div")); var hh = el("div");
+    for (var h = 8; h <= 16; h += 2) hh.appendChild(el("span", null, (h > 12 ? h - 12 : h) + (h >= 12 ? "p" : "a")));
+    hrs.appendChild(hh); g.appendChild(hrs);
+    var leaves = [];
+    Object.keys(P).forEach(function (n) {
+      var cls = P[n][state.day], row = el("div", "grow"), lane = el("div", "lane");
+      row.appendChild(el("div", "name", n)); row.appendChild(lane);
+      var on = state.who[n] && cls.length;
+      if (!cls.length) lane.appendChild(el("div", "nocls", "no class"));
+      cls.forEach(function (c) {
+        var b = el("div", "blk", c[2]);
+        b.style.left = pct(c[0]) + "%"; b.style.width = (pct(c[1]) - pct(c[0])) + "%"; b.style.background = COLORS[n];
+        if (!on) b.style.opacity = ".3"; lane.appendChild(b);
+      });
+      if (on) {
+        var last = Math.max.apply(null, cls.map(function (c) { return c[1]; })), t = Math.ceil((last + state.buf) / 5) * 5;
+        leaves.push({ n: n, t: t });
+        var f = el("div", "free"); f.style.left = pct(t) + "%"; f.style.right = "0"; lane.appendChild(f);
+      }
+      g.appendChild(row);
+    });
+    var v = document.getElementById("verdict");
+    if (!leaves.length) { v.innerHTML = "<strong>Pick at least one person</strong><span>Choose who is coming along to see a leave time.</span>"; return; }
+    var t = Math.max.apply(null, leaves.map(function (l) { return l.t; }));
+    var wrap = el("div", "lineWrap"), ln = el("div", "leave"); ln.style.left = pct(t) + "%";
+    ln.appendChild(el("b", null, fmt(t))); wrap.appendChild(ln);
+    g.appendChild(wrap);
+    var late = leaves.filter(function (l) { return l.t === t; })[0].n;
+    v.innerHTML = "<strong>Leave at " + fmt(t) + "</strong><span>" + (leaves.length > 1
+      ? "Everyone selected is free by then. " + late + " finishes last." : leaves[0].n + " is free from " + fmt(t) + ".")
+      + " Includes " + state.buf + " minutes to pack up.</span>";
+  }
+  render();
+
+  /* ---------- privacy ---------- */
+  var opt = document.getElementById("optin"), prof = document.getElementById("profile"), note = document.getElementById("forgetNote"), forgotten = false;
+  function renderProfile() {
+    var on = opt.checked && !forgotten;
+    prof.innerHTML =
+      "<div class='row'><span>Home address</span><span class='pill hide'>" + (forgotten ? "deleted" : "hidden from everyone") + "</span></div>" +
+      "<div class='row'><span>Area</span><span>" + (on ? "Tempe Village <span class='pill show'>shown</span>" : (forgotten ? "deleted" : "<span class='pill hide'>not shown</span>")) + "</span></div>" +
+      "<div class='row'><span>Departure window</span><span>" + (on ? "<span class='time'>08:00-08:30</span> <span class='pill show'>shown</span>" : (forgotten ? "deleted" : "<span class='pill hide'>not shown</span>")) + "</span></div>" +
+      "<div class='row'><span>Appears in /commute match</span><span>" + (on ? "<span class='pill show'>yes</span>" : "<span class='pill hide'>no</span>") + "</span></div>";
+    note.textContent = forgotten ? "Your commute profile and address were deleted. Run /commute setup to add them again." : "";
+  }
+  opt.addEventListener("change", function () { if (opt.checked) forgotten = false; renderProfile(); });
+  document.getElementById("forget").addEventListener("click", function () { forgotten = true; opt.checked = false; renderProfile(); });
+  renderProfile();
+})();
+</script>
+</body>
+</html>
