@@ -60,6 +60,32 @@ class Schedule(unittest.TestCase):
         self.assertEqual(missing_for_save(bad), ["location", "valid meeting times"])
         self.assertIn("Mon/Wed/Fri 9:00 AM-9:50 AM", format_schedule(sched))
 
+    def test_reading_quirks_from_real_screenshots(self):
+        from src.agent.logic.schedule import _start_end
+        self.assertEqual(_start_end("10:00 - 10:50 AM", "10:00 - 10:50 AM"), ("10:00", "10:50"))  # range in one field
+        self.assertEqual(_start_end("1:30", "2:45 PM"), ("13:30", "14:45"))  # start takes the end's PM
+        self.assertEqual(_start_end("11:30", "12:20 PM"), ("11:30", "12:20"))  # ... unless that is after the end
+        self.assertEqual(_start_end("12:00", "1:30 PM"), ("12:00", "13:30"))
+        raw = {"courses": [
+            {"course_code": "MAT 210", "course_name": "Calculus II", "location": "PSF 201", "meeting_patterns": [
+                {"days": "Mon/Wed", "start_time": "10:30 AM", "end_time": "11:20 AM"},
+                {"days": "Mon/Wed", "start_time": "11:00 - 11:50 AM", "end_time": "11:00 - 11:50 AM"}]},
+            {"course_code": "CSE 110", "course_name": "Introduction to Programming", "location": "ISTB4 101",
+             "meeting_patterns": [{"days": "MWF", "start_time": "9:30 AM", "end_time": "9:20 AM"}]},
+            {"course_code": "CSE 110", "course_name": "CSE 110 Lab", "location": "", "meeting_patterns": [
+                {"days": "Tue", "start_time": "2:00 PM", "end_time": "2:15 PM"},
+                {"days": "Thu", "start_time": "1:00 PM", "end_time": "2:15 PM"}]}]}
+        sched, warnings = normalize_schedule(raw)
+        self.assertIn("MAT 210 has two meeting times that overlap on Mon/Wed (10:30 AM-11:20 AM and "
+                      "11:00 AM-11:50 AM); please check the times.", warnings)
+        self.assertIn("CSE 110 (Introduction to Programming): ends (9:20 AM) before it starts (9:30 AM); "
+                      "please check the time.", warnings)
+        self.assertIn("CSE 110 (Lab): no location found.", warnings)
+        lab = sched["courses"][2]
+        self.assertEqual(lab["course_name"], "Lab")
+        self.assertEqual([(p["day_of_week"], p["start_time"]) for p in lab["meeting_patterns"]],
+                         [("Tuesday", "14:00"), ("Thursday", "13:00")])
+
     def test_classes_on_skips_online(self):
         sched, _ = normalize_schedule({"courses": [
             {"course_code": "A 100", "meeting_patterns": [{"days": "M", "start_time": "10:00", "end_time": "11:00"}],

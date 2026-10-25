@@ -23,9 +23,18 @@ PROMPT = """Read this class schedule screenshot. Return ONLY JSON, no prose, in 
  "courses": [{"course_code": "CSE 110", "course_name": "Principles of Programming", "section": "12345 or empty",
               "meeting_patterns": [{"days": "Mon/Wed/Fri", "start_time": "9:00 AM", "end_time": "9:50 AM"}],
               "location": "Tempe - ISTB4 101"}]}
-Copy text exactly as shown. One entry per course; add a pattern per distinct meeting time. Online classes:
-location "Online" and no meeting_patterns if no times are shown. Never guess a value you can't read: leave it
-empty. If the image is not a class schedule, return {"semester": "", "courses": []}."""
+Rules:
+- Copy text exactly as shown. Read each block's own time text; don't infer it from where the block sits.
+- start_time and end_time each hold ONE time with AM/PM. "10:00 - 10:50 AM" becomes "start_time": "10:00 AM",
+  "end_time": "10:50 AM".
+- One entry per course. A lab, recitation or discussion is its own entry with the same course_code and
+  "Lab" (etc.) in course_name, e.g. {"course_code": "CSE 110", "course_name": "Introduction to Programming Lab"}.
+- Group days into one pattern only when the times are identical. If Tuesday is 2:00-2:15 PM and Thursday is
+  1:00-2:15 PM, write two patterns: {"days": "Tue", ...} and {"days": "Thu", ...}.
+- Only classes. Skip study time, meals, meetings, clubs, work shifts, gym, events and review sessions.
+- Online classes: location "Online" and no meeting_patterns if no times are shown.
+- Never guess a value you can't read: leave it empty. If the image is not a class schedule, return
+  {"semester": "", "courses": []}."""
 
 
 def image_data_url(image_input: bytes | str, mime_type: str) -> str:
