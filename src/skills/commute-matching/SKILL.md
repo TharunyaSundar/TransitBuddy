@@ -23,9 +23,11 @@ Matches nearby students who share compatible schedules and commute preferences w
 - An invitation to ask whether they are interested.
 
 ## Tools needed
-- Database queries for schedules and preferences.
-- Matching logic for schedule compatibility.
-- Response formatting for Discord.
+- get_my_commute_preferences / save_commute_preferences (general area, modes, usual departure window, opt-in).
+- find_commute_partners (opted-in students, same general area, arrival or leaving times within 30 minutes).
+
+## Keywords
+commute, partner, partners, heading, going, campus, travel, together, nearby, area, match, buddy, bus, carpool
 
 ## Rules and constraints
 - Only consider students who explicitly opted into commute matching.

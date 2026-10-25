@@ -23,9 +23,11 @@ Helps students coordinate group ride requests while balancing personal departure
 - An offer to propose a group departure time.
 
 ## Tools needed
-- Ride request retrieval.
-- Preference and schedule data access.
-- Constraint negotiation utilities.
+- list_open_ride_requests, create_ride_request (only when asked), update_my_ride_request.
+- propose_group_departure (schedules + saved windows + what people said in the chat).
+
+## Keywords
+ride, rides, uber, lyft, share, sharing, carpool, split, group, pick, pickup, request, driver
 
 ## Rules and constraints
 - Respect explicit opt-in behavior.

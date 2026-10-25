@@ -23,9 +23,13 @@ Helps interpret uploaded class schedule screenshots and prepare a student schedu
 - A response that asks for confirmation before persisting the schedule.
 
 ## Tools needed
-- Multimodal extraction workflow.
-- Student context lookup.
-- Validation and parsing utilities.
+- Screenshots: AgentService.extract_schedule_from_image (called by the Discord layer before the agent sees the message).
+- Typed classes: prepare_schedule_from_text (checks and prepares; never saves).
+- get_my_schedule to show what is already saved.
+- Saving happens only through AgentService.save_confirmed_schedule after the student presses Confirm.
+
+## Keywords
+schedule, timetable, screenshot, upload, classes, class, courses, course, semester, extract, save, my schedule
 
 ## Rules and constraints
 - Never persist unconfirmed schedules.

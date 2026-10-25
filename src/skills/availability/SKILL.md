@@ -23,9 +23,11 @@ Determines when students are realistically available to leave campus based on th
 - Conflict notes where constraints are not aligned.
 
 ## Tools needed
-- Schedule analysis.
-- Commute preference lookup.
-- Time-window comparison utilities.
+- get_availability (on campus by, classes over at, usual window, for the user and anyone @mentioned).
+- propose_group_departure (common window, or the best compromise and who would need to move).
+
+## Keywords
+leave, leaving, available, availability, free, when, depart, departure, window, agree, negotiate, after, before, time
 
 ## Rules and constraints
 - A class ending at a given time does not automatically imply an immediate departure.

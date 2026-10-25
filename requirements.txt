@@ -1,0 +1,5 @@
+# Developer 3: LangChain agent (src/agent)
+langchain>=1.4,<2
+langgraph>=1.2,<2
+langchain-ollama>=1.1,<2
+python-dotenv>=1.2,<2
