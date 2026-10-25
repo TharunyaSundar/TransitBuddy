@@ -1,14 +1,12 @@
 .env
 .env.*
 !.env.example
-node_modules/
+.DS_Store
+coverage/
+
+# Python
 __pycache__/
-*.py[cod]
-venv/
+*.pyc
 .venv/
 .pytest_cache/
-.mypy_cache/
-.ruff_cache/
-coverage/
-.DS_Store
-npm-debug.log*
+*.egg-info/
