@@ -6,7 +6,7 @@ student leaves at 10:15. Each window says where it came from so replies can be h
 from dataclasses import asdict, dataclass, field
 
 from .schedule import classes_on
-from .timeutil import from_minutes, parse_window, to_minutes
+from .timeutil import display, from_minutes, parse_window, to_minutes
 
 ARRIVAL_BUFFER_MIN = 10  # arrive this long before the first class
 EXIT_BUFFER_MIN = 10  # earliest realistic exit after the last class (walk out, pack up)
@@ -66,26 +66,32 @@ def departure_window(av: DayAvailability, direction: str, travel_min: int,
         latest = END_OF_DAY
         if target:
             latest = to_minutes(target) - travel_min
-            why.append(f"must arrive by {target}")
+            why.append(f"must arrive by {display(target)}")
         earliest = 0
         if pref:
             earliest = pref[0]
             latest = min(latest, pref[1]) if not target else latest
-            why.append(f"usually leaves {av.preferred_window}")
+            why.append(f"usually leaves {_window_text(av.preferred_window)}")
     else:
         if not av.has_classes and not stated and not pref:
             return None
         earliest, latest = 0, END_OF_DAY
         if av.earliest_leave_campus:
             earliest = to_minutes(av.earliest_leave_campus)
-            why.append(f"classes over at {av.last_class_end}")
+            why.append(f"classes over at {display(av.last_class_end)}")
         if pref:
             earliest, latest = max(earliest, pref[0]), max(pref[1], earliest)
-            why.append(f"usually leaves {av.preferred_window}")
+            why.append(f"usually leaves {_window_text(av.preferred_window)}")
     if stated.get("earliest"):
         earliest = to_minutes(stated["earliest"])
-        why.append(f"said they can leave from {stated['earliest']}")
+        why.append(f"said they can leave from {display(stated['earliest'])}")
     if stated.get("latest"):
         latest = to_minutes(stated["latest"])
-        why.append(f"said they must leave by {stated['latest']}")
+        why.append(f"said they must leave by {display(stated['latest'])}")
     return earliest, latest, why
+
+
+def _window_text(window: str) -> str:
+    """'08:00-08:30' -> '8:00-8:30 AM' style for replies."""
+    w = parse_window(window)
+    return f"{display(from_minutes(w[0]))}-{display(from_minutes(w[1]))}" if w else window

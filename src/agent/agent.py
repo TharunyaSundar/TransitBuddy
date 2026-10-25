@@ -20,6 +20,7 @@ from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from ..shared.contracts import AgentResponse, ProcessMessageContext, ScheduleExtractionResult, StudentSchedule
+from . import commute
 from . import db as dbcall
 from .extraction.schedule_extraction import extract_schedule
 from .llm import create_chat_model, create_vision_model
@@ -27,7 +28,8 @@ from .logic.schedule import format_schedule, is_valid_course, missing_for_save
 from .logic.timeutil import now as tz_now
 from .prompts.system_prompt import build_system_prompt
 from .skill_loader import load_skills, select_skills, skills_prompt
-from .tools.agent_tools import ALL_TOOLS, AgentContext
+from .tools.agent_tools import (ALL_TOOLS, AgentContext, find_commute_partners, get_availability,
+                                 propose_group_departure)
 
 log = logging.getLogger(__name__)
 
@@ -150,6 +152,41 @@ class AgentService:
         if not parts:
             return "You haven't saved a schedule yet. Use /schedule upload with a screenshot of your class schedule."
         return "\n\n".join(parts)[:MAX_RESPONSE_CHARS]
+
+    # Slash commands: structured input, answered by the tools directly (no language model).
+
+    def _command_context(self, user_id: str, guild_id: str, classmate_ids=()) -> AgentContext:
+        group = [u for u in dict.fromkeys(classmate_ids or []) if u and u != user_id]
+        return AgentContext(discord_user_id=user_id, discord_guild_id=guild_id or "dm", db=self.db,
+                            mentioned_user_ids=group, now=self.clock(), pending=self.pending)
+
+    async def commute_availability(self, discord_user_id: str, discord_guild_id: str, day: str = "today",
+                                   classmate_ids: list[str] | None = None) -> str:
+        """When the student (and any classmates) must be on campus and when their classes are over."""
+        ctx = self._command_context(discord_user_id, discord_guild_id, classmate_ids)
+        return commute.availability_text(await commute.run_tool(get_availability, ctx, day=day))
+
+    async def commute_match(self, discord_user_id: str, discord_guild_id: str, day: str = "today",
+                            direction: str = "to_campus", around: str | None = None,
+                            classmate_ids: list[str] | None = None) -> str:
+        """Opted-in students from the same general area with compatible times."""
+        ctx = self._command_context(discord_user_id, discord_guild_id, classmate_ids)
+        r = await commute.run_tool(find_commute_partners, ctx, day=day, direction=direction,
+                                   around_time=around)
+        return commute.match_text(r)
+
+    async def commute_plan(self, discord_user_id: str, discord_guild_id: str, classmate_ids: list[str],
+                           day: str = "today", direction: str = "to_campus", travel_minutes: int | None = None,
+                           arrive_by: str | None = None, constraints: str | None = None) -> str:
+        """One departure time for the student and classmates, or the closest compromise.
+        constraints: sentences separated by ';' or new lines, e.g. "Priya can't leave before 8:30 AM"."""
+        ctx = self._command_context(discord_user_id, discord_guild_id, classmate_ids)
+        items = [c.strip() for c in (constraints or "").replace("\n", ";").split(";") if c.strip()]
+        r = await commute.run_tool(propose_group_departure, ctx, day=day, direction=direction,
+                                   travel_minutes=travel_minutes or commute.DEFAULT_TRAVEL_MIN,
+                                   arrive_by=arrive_by, stated_constraints=items)
+        r.setdefault("direction", direction)
+        return commute.plan_text(r, travel_given=travel_minutes is not None)[:MAX_RESPONSE_CHARS]
 
     def discard_pending_schedule(self, discord_user_id: str) -> None:
         self.pending.pop(discord_user_id, None)

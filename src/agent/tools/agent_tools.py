@@ -146,10 +146,12 @@ async def find_commute_partners(runtime: ToolRuntime[AgentContext], day: str = "
     d = resolve_day(day, _now(ctx))
     my_av, my_prefs, _ = await _availability(ctx, ctx.discord_user_id, d)
     if not my_prefs or not my_prefs.get("general_origin_area"):
-        return _out({"ok": False, "error": "I need their general area first (e.g. Mesa, Downtown Phoenix). Ask, "
-                                           "then save_commute_preferences."})
+        return _out({"ok": False, "code": "need_area",
+                     "error": "I need their general area first (e.g. Mesa, Downtown Phoenix). Ask, "
+                              "then save_commute_preferences."})
     candidates: dict[str, dict] = {}
-    if dbcall.has(ctx.db, "get_opted_in_commute_preferences"):
+    whole_server = dbcall.has(ctx.db, "get_opted_in_commute_preferences")
+    if whole_server:
         for p in await dbcall.call(ctx.db, "get_opted_in_commute_preferences", ctx.discord_guild_id) or []:
             candidates[p["discord_user_id"]] = p
     others = set(ctx.mentioned_user_ids) | {r["discord_user_id"] for r in
@@ -169,6 +171,7 @@ async def find_commute_partners(runtime: ToolRuntime[AgentContext], day: str = "
     for m in matches:
         m["who"] = await _name(ctx, m.pop("discord_user_id"))
     return _out({"ok": True, "day": d, "direction": direction, "matches": matches[:5],
+                 "searchedWholeServer": whole_server,
                  "note": "Only students who opted in to ride-sharing are included. Ask before connecting them."})
 
 
@@ -223,7 +226,8 @@ async def propose_group_departure(runtime: ToolRuntime[AgentContext], day: str =
     if direction not in DIRECTIONS:
         direction = "to_campus"
     if not ctx.mentioned_user_ids:
-        return _out({"ok": False, "error": "Ask who is in the group: they can @mention the other students."})
+        return _out({"ok": False, "code": "need_group",
+                     "error": "Ask who is in the group: they can @mention the other students."})
     d = resolve_day(day, _now(ctx))
     group = [ctx.discord_user_id, *ctx.mentioned_user_ids]
     names = {uid: await _name(ctx, uid) for uid in group}
@@ -250,10 +254,12 @@ async def propose_group_departure(runtime: ToolRuntime[AgentContext], day: str =
             windows[uid] = w
     if not windows or missing:
         need = "what time they need to be on campus" if direction == "to_campus" else "when they can leave"
-        return _out({"ok": False, "day": d, "noInfoFor": missing,
+        return _out({"ok": False, "code": "no_info", "day": d, "noInfoFor": missing,
                      "error": f"No classes or saved times on {d} for {', '.join(missing)}. Ask {need} "
                               "(then pass arrive_by or stated_constraints). Don't suggest a time yourself."})
     result = negotiate(windows)
+    if "participants" in result:  # impossible_for_some: name them instead of IDs
+        result["participants"] = {names[u]: why for u, why in result["participants"].items()}
     for c in result.get("fitsEveryoneExcept", []):
         c["who"] = names[c.pop("discord_user_id")]
     if "fits" in result:

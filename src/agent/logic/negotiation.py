@@ -14,8 +14,8 @@ def negotiate(windows: dict[str, tuple[int, int, list[str]]]) -> dict:
     bad = {u: w for u, w in windows.items() if w[0] > w[1]}
     if bad:
         return {"status": "impossible_for_some",
-                "participants": {u: f"earliest {from_minutes(w[0])} is after latest {from_minutes(w[1])}"
-                                 for u, w in bad.items()}}
+                "participants": {u: f"can't leave until {display(from_minutes(w[0]))} but would have to leave by "
+                                    f"{display(from_minutes(w[1]))}" for u, w in bad.items()}}
     lo = max(w[0] for w in windows.values())
     hi = min(w[1] for w in windows.values())
     if lo <= hi:

@@ -7,6 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from src.config import settings
+from src.discord_bot.commands.commute import build_commute_group
 from src.discord_bot.commands.schedule import build_schedule_group
 from src.shared.contracts import ProcessMessageContext
 from src.utils.logger import log
@@ -22,6 +23,7 @@ def create_discord_client(
 	bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents)
 	bot.agent = agent_service
 	bot.tree.add_command(build_schedule_group(lambda: bot.agent))
+	bot.tree.add_command(build_commute_group(lambda: bot.agent))
 
 	@bot.tree.command(name="ping", description="Check whether Transit Buddy is online.")
 	async def ping(interaction: discord.Interaction) -> None:
@@ -32,7 +34,7 @@ def create_discord_client(
 		if bot.agent is None:
 			text = "Transit Buddy is online, but schedule and assistant features are unavailable."
 		else:
-			text = "Transit Buddy is online. Use /ask for commute questions or /schedule for your schedule."
+			text = "Transit Buddy is online. Use /ask, /schedule, or /commute for help."
 		await interaction.response.send_message(text)
 
 	@bot.tree.command(name="ask", description="Ask Transit Buddy about schedules and commutes.")
