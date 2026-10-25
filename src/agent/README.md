@@ -14,8 +14,8 @@ only general areas and approximate times for other students, and only students w
 ## For Developer 1 (Discord)
 
 ```python
-from transit_buddy.agent import AgentService
-from transit_buddy.shared.contracts import ProcessMessageContext
+from src.agent import AgentService
+from src.shared.contracts import ProcessMessageContext
 
 agent = AgentService(database_service)   # Developer 2's DatabaseService instance
 
@@ -44,22 +44,35 @@ agent.discard_pending_schedule(user_id)                           # Edit / Cance
 
 The agent never sends Discord messages and never saves an unconfirmed schedule.
 
-## For Developer 2 (database)
+## Wiring with Developer 2's database
 
-`AgentService` takes Developer 2's `DatabaseService` from `docs/integration-contracts.md`: async methods taking
-and returning the Pydantic models in `transit_buddy/shared/contracts.py`. `agent/db.py` validates every write
-into the right model (`StudentSchedule`, `CommutePreferences`, `RideRequest`) and reads results back with
-`model_dump()`.
+The app (Developer 1's startup code) connects once and passes the real service in:
 
-One addition is requested: `async get_opted_in_commute_preferences(discord_guild_id) -> list[CommutePreferences]`,
-so "anyone heading to campus at 9?" can search the whole server. Without it, matching only sees @mentioned
-students and students with open ride requests.
+```python
+from src.agent import AgentService
+from src.database import DatabaseService, connect_database
 
-`dev_database.py` is an in-memory version of the contract with four fictional students, which the agent's tests
-use. You can use it as a reference.
+await connect_database()                      # MONGODB_URI / MONGODB_DATABASE from .env
+agent = AgentService(DatabaseService())
+```
 
-Schedules saved by the agent may have an empty `course_name` or `section` when the screenshot doesn't show them.
-The shared `is_valid_course` rejects those, so the agent uses the same check without those two fields.
+How the agent works with `src/database`:
+- Every write is validated into the shared model (`StudentSchedule`, `CommutePreferences`, `RideRequest`) before
+  it reaches `DatabaseService`, and results are read back with `model_dump()` (`agent/db.py`).
+- `save_schedule` only accepts courses that pass the shared `is_valid_course`, which needs a course name and
+  a section number. The agent warns about missing ones when it reads a schedule, and `save_confirmed_schedule`
+  raises `ValueError` saying which class needs what, so Discord can ask the student before saving.
+- `create_ride_request` sends an empty `request_id`, and the database assigns it.
+- If MongoDB is down or not connected, the tool reports a database problem and the agent tells the student;
+  the reply doesn't crash.
+- The contract has no "all opted-in students in a server" query, so "anyone heading to campus at 9?" only
+  searches @mentioned students and students with open ride requests. Adding
+  `async get_opted_in_commute_preferences(discord_guild_id) -> list[CommutePreferences]` to `DatabaseService`
+  (the `guild_optin` index already exists) would let it search the whole server; the agent uses it
+  automatically when it's there.
+
+`dev_database.py` is an in-memory version of the same contract with four fictional students, for tests and
+for the terminal chat without MongoDB.
 
 ## Tools the model can call
 
@@ -73,7 +86,7 @@ The shared `is_valid_course` rejects those, so the agent uses the same check wit
 | `get_my_commute_preferences` / `save_commute_preferences` | General area only (street addresses are refused), modes, window, opt-in |
 | `list_open_ride_requests` / `create_ride_request` / `update_my_ride_request` | Ride requests (students can only change their own) |
 
-Skills are `transit_buddy/skills/*/SKILL.md`. Each skill's description always goes into the prompt; the full rules go in
+Skills are `src/skills/*/SKILL.md`. Each skill's description always goes into the prompt; the full rules go in
 only for the one or two skills that match the message, to keep token use low.
 
 ## Setup and testing
@@ -81,10 +94,16 @@ only for the one or two skills that match the message, to keep token use low.
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cp .env.example .env                                  # LLM_MODEL=glm-5.3-flash:cloud, LLM_REASONING=low
-.venv/bin/python -m pytest tests/agent               # offline tests: no model, network or database
+.venv/bin/python -m pytest tests                      # offline: agent, shared and database unit tests
+TEST_MONGODB_URI=mongodb://localhost:27017 .venv/bin/python -m pytest tests   # plus real-MongoDB tests
 .venv/bin/python tests/agent/live_smoke.py [schedule.png]   # real model, demo data
-.venv/bin/python -m transit_buddy.agent.cli          # chat in the terminal (/as, /mention, /image, /confirm)
+.venv/bin/python -m src.agent.cli                    # terminal chat, demo data (/as, /mention, /image, /confirm)
+.venv/bin/python -m src.agent.cli --mongo            # terminal chat on MongoDB (MONGODB_URI; seed with
+                                                      # python -m scripts.seed_demo_data, guild demo-guild)
 ```
+
+`tests/agent/test_with_database.py` runs the agent against Developer 2's `DatabaseService` on a real MongoDB,
+in its own `transit_buddy_agent_test` database that it drops afterwards.
 
 Model choice: `glm-5.3-flash:cloud` with thinking set to low. Among the Ollama flash models tested, it used the
 fewest tokens on tool calls, and it reads schedule screenshots. Change it with `LLM_MODEL`.

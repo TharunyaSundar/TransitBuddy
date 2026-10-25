@@ -23,7 +23,7 @@ from ..shared.contracts import AgentResponse, ProcessMessageContext, ScheduleExt
 from . import db as dbcall
 from .extraction.schedule_extraction import extract_schedule
 from .llm import create_chat_model, create_vision_model
-from .logic.schedule import format_schedule, is_valid_course
+from .logic.schedule import format_schedule, is_valid_course, missing_for_save
 from .logic.timeutil import now as tz_now
 from .prompts.system_prompt import build_system_prompt
 from .skill_loader import load_skills, select_skills, skills_prompt
@@ -123,9 +123,10 @@ class AgentService:
         sched = schedule or self.pending.get(discord_user_id)
         if not sched or not sched.get("courses"):
             raise ValueError("no schedule waiting for confirmation")
-        bad = [c.get("course_code") or "?" for c in sched["courses"] if not is_valid_course(c)]
+        bad = [f"{c.get('course_code') or '?'} ({', '.join(missing_for_save(c))})"
+               for c in sched["courses"] if not is_valid_course(c)]
         if bad:
-            raise ValueError(f"fix these classes before saving: {', '.join(bad)}")
+            raise ValueError(f"fix these classes before saving: {'; '.join(bad)}")
         doc = {"discord_user_id": discord_user_id, "discord_guild_id": discord_guild_id or "dm",
                "semester": sched.get("semester") or "", "courses": sched["courses"],
                "confirmation_status": "confirmed",

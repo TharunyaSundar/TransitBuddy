@@ -7,6 +7,7 @@ from typing import Any
 
 from ...shared.contracts import COURSE_WEEKDAYS as WEEKDAYS
 from ...shared.validators import is_non_empty_string, is_valid_time_string, is_valid_weekday
+from ...shared.validators import is_valid_course as is_valid_course_shared
 from .timeutil import display, normalize_days, normalize_time, to_minutes
 
 ONLINE = re.compile(r"\b(online|remote|zoom|icourse|asu online|sync|tba|tbd)\b", re.I)
@@ -70,6 +71,11 @@ def normalize_schedule(raw: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
             warnings.append(f"{label}: no meeting times found.")
         if not location:
             warnings.append(f"{label}: no location found.")
+        if not str(c.get("course_name") or "").strip():
+            warnings.append(f"{label}: course name missing; it's needed to save the schedule.")
+        if not str(c.get("section") or "").strip():
+            warnings.append(f"{label}: section number missing (the 5-digit class number in My ASU); "
+                            "it's needed to save the schedule.")
         courses.append({
             "course_code": code,
             "course_name": str(c.get("course_name") or "").strip(),
@@ -96,14 +102,19 @@ def _overlaps(courses: list[dict], warnings: list[str]) -> None:
                 warnings.append(f"{a} and {b} overlap on {pa['day_of_week']}; please check the times.")
 
 
+def missing_for_save(c: dict) -> list[str]:
+    """What DatabaseService.save_schedule (shared is_valid_course) would reject in this course."""
+    missing = [label for key, label in (("course_code", "course code"), ("course_name", "course name"),
+                                        ("section", "section number"), ("location", "location"))
+               if not is_non_empty_string(c.get(key))]
+    if not all(isinstance(p, dict) and is_valid_weekday(p.get("day_of_week")) and is_valid_time_string(p.get("start_time"))
+               and is_valid_time_string(p.get("end_time")) for p in c.get("meeting_patterns") or []):
+        missing.append("valid meeting times")
+    return missing
+
+
 def is_valid_course(c: dict) -> bool:
-    """Like shared.validators.is_valid_course, except course_name and section may be empty: screenshots and
-    typed schedules often don't show them, and the student shouldn't be blocked from saving for that."""
-    return (is_non_empty_string(c.get("course_code")) and is_non_empty_string(c.get("location"))
-            and isinstance(c.get("meeting_patterns"), list)
-            and all(isinstance(p, dict) and is_valid_weekday(p.get("day_of_week"))
-                    and is_valid_time_string(p.get("start_time")) and is_valid_time_string(p.get("end_time"))
-                    for p in c["meeting_patterns"]))
+    return is_valid_course_shared(c)
 
 
 def classes_on(schedule: dict | None, day: str) -> list[dict]:

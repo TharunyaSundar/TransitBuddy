@@ -1,4 +1,4 @@
-"""Load the agent's skills from transit_buddy/skills/*/SKILL.md and pick the ones relevant to a message.
+"""Load the agent's skills from src/skills/*/SKILL.md and pick the ones relevant to a message.
 
 A SKILL.md has '## Section' headings (Name, Description, Activation conditions, Rules and constraints, ...).
 Every skill's one-line description always goes into the prompt; the full rules only for the selected skills,

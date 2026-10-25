@@ -1,4 +1,4 @@
-from transit_buddy.shared.validators import (
+from src.shared.validators import (
     is_valid_course,
     is_valid_time_string,
     is_valid_weekday,

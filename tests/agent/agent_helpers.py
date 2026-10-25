@@ -46,5 +46,5 @@ def get(db, method: str, *args):
     """Call an async DatabaseService method from a sync test and return plain dicts."""
     import asyncio
 
-    from transit_buddy.agent.db import plain
+    from src.agent.db import plain
     return plain(asyncio.run(getattr(db, method)(*args)))

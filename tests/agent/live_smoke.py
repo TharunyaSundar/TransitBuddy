@@ -10,8 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # run as a script 
 
 from dotenv import load_dotenv  # noqa: E402
 
-from transit_buddy.agent import AgentService
-from transit_buddy.agent.dev_database import DEMO_GUILD, demo_database
+from src.agent import AgentService
+from src.agent.dev_database import DEMO_GUILD, demo_database
 from agent_helpers import MONDAY_7AM
 
 TURNS = [

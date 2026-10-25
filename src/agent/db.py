@@ -1,4 +1,4 @@
-"""Calls into Developer 2's DatabaseService (transit_buddy.shared.contracts).
+"""Calls into Developer 2's DatabaseService (src.shared.contracts).
 
 The service takes and returns the shared Pydantic models. The agent works with plain dicts, so writes are
 validated into the matching model here and results are dumped back to dicts. Sync methods work too.

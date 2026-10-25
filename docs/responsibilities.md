@@ -25,7 +25,7 @@ Responsibilities:
 
 Owned area:
 
-- transit_buddy/discord_bot/
+- src/discord_bot/
 - scripts/register_discord_commands.py
 - tests/discord/
 
@@ -56,7 +56,7 @@ Responsibilities:
 
 Owned area:
 
-- transit_buddy/database/
+- src/database/
 - scripts/seed_demo_data.py
 - tests/database/
 
@@ -88,8 +88,8 @@ Responsibilities:
 
 Owned area:
 
-- transit_buddy/agent/
-- transit_buddy/skills/
+- src/agent/
+- src/skills/
 - tests/agent/
 
 Non-goals:

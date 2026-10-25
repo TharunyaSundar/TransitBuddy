@@ -1,4 +1,4 @@
-"""LLM setup. Provider and model come from transit_buddy.config.settings; the rest from the environment
+"""LLM setup. Provider and model come from src.config.settings; the rest from the environment
 (.env.example):
 
 LLM_PROVIDER   ollama (default; the only provider wired up so far)

@@ -5,6 +5,7 @@ address or full schedule. Matching only includes students who opted in.
 """
 import functools
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -21,6 +22,7 @@ from ..logic.schedule import format_schedule, normalize_schedule
 from ..logic.timeutil import display, from_minutes, normalize_time, parse_window, resolve_day, to_minutes
 
 DIRECTIONS = ("to_campus", "from_campus")
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -67,8 +69,11 @@ def _guarded(fn):
             return await fn(*args, **kwargs)
         except dbcall.DatabaseUnavailable:
             return _out({"ok": False, "error": "The schedule database isn't connected right now."})
-        except ValueError as e:
+        except ValueError as e:  # bad input, from our checks or DatabaseService validation
             return _out({"ok": False, "error": str(e)})
+        except Exception:  # MongoDB down, timeouts, not connected: don't fail the whole reply
+            log.exception("tool %s failed", fn.__name__)
+            return _out({"ok": False, "error": "The schedule database had a problem. Try again in a minute."})
     return wrapper
 
 
@@ -328,11 +333,11 @@ async def create_ride_request(origin_area: str, destination_area: str, desired_d
     ctx = runtime.context
     if _ADDRESS.search(origin_area) or _ADDRESS.search(destination_area):
         return _out({"ok": False, "error": "Use general areas (e.g. Mesa, ASU Tempe campus), not addresses."})
-    req = {"request_id": f"{ctx.discord_user_id[-4:]}-{int(_now(ctx).timestamp())}", "discord_user_id": ctx.discord_user_id, "discord_guild_id": ctx.discord_guild_id,
+    req = {"request_id": "", "discord_user_id": ctx.discord_user_id, "discord_guild_id": ctx.discord_guild_id,
            "origin_area": origin_area, "destination_area": destination_area,
            "desired_departure_time": desired_departure_time, "status": "open",
            "created_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat()}
-    saved = await dbcall.call(ctx.db, "create_ride_request", req)
+    saved = await dbcall.call(ctx.db, "create_ride_request", req)  # DatabaseService assigns request_id
     ctx.events["ride_request_created"] = (saved or req)["request_id"]
     return _out({"ok": True, "request": saved or req})
 

@@ -1,6 +1,7 @@
 """In-memory DatabaseService with fictional ASU students, for agent tests and local runs before Developer 2's
 MongoDB service is ready. Same async methods and shared Pydantic models as docs/integration-contracts.md.
 """
+import uuid
 from datetime import datetime, timezone
 
 from ..shared.contracts import CommutePreferences, RideRequest, Student, StudentSchedule
@@ -70,8 +71,9 @@ class InMemoryDatabaseService:
 
     async def create_ride_request(self, request: RideRequest) -> RideRequest:
         _need(request)
-        self.rides[request.request_id] = request.model_copy(deep=True)
-        return request.model_copy(deep=True)
+        doc = request.model_copy(update={"request_id": request.request_id or uuid.uuid4().hex, "created_at": _now()})
+        self.rides[doc.request_id] = doc
+        return doc.model_copy(deep=True)
 
     async def get_open_ride_requests(self, discord_guild_id: str) -> list[RideRequest]:
         return [r.model_copy(deep=True) for r in self.rides.values()

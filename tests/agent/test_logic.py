@@ -1,11 +1,12 @@
 import unittest
 
-from transit_buddy.agent.dev_database import DEMO_GUILD, demo_database
-from transit_buddy.agent.logic.availability import day_availability, departure_window
-from transit_buddy.agent.logic.matching import find_matches, same_area
-from transit_buddy.agent.logic.negotiation import negotiate
-from transit_buddy.agent.logic.schedule import classes_on, format_schedule, is_valid_course, normalize_schedule
-from transit_buddy.agent.logic.timeutil import display, normalize_days, normalize_time, parse_window, resolve_day, to_minutes
+from src.agent.dev_database import DEMO_GUILD, demo_database
+from src.agent.logic.availability import day_availability, departure_window
+from src.agent.logic.matching import find_matches, same_area
+from src.agent.logic.negotiation import negotiate
+from src.agent.logic.schedule import (classes_on, format_schedule, is_valid_course, missing_for_save,
+                                      normalize_schedule)
+from src.agent.logic.timeutil import display, normalize_days, normalize_time, parse_window, resolve_day, to_minutes
 
 from agent_helpers import MONDAY_7AM, get
 
@@ -48,9 +49,12 @@ class Schedule(unittest.TestCase):
         self.assertEqual(sched["courses"][0]["course_code"], "CSE 110")
         self.assertEqual(len(sched["courses"][0]["meeting_patterns"]), 3)
         self.assertTrue(any("overlap" in w for w in warnings))  # CSE 110 and MAT 265 on Monday
-        self.assertFalse(any("HST 109" in w for w in warnings))  # online: no times needed
+        self.assertFalse(any("HST 109" in w and "time" in w for w in warnings))  # online: no times needed
         self.assertTrue(any("ENG 101" in w and "unusual" in w for w in warnings))  # 1:30 read as 01:30
-        self.assertTrue(all(is_valid_course(c) for c in sched["courses"][:2]))
+        # DatabaseService needs a course name and section: missing ones are flagged so the student is asked
+        self.assertFalse(is_valid_course(sched["courses"][0]))
+        self.assertEqual(missing_for_save(sched["courses"][0]), ["section number"])
+        self.assertTrue(any("CSE 110: section number missing" in w for w in warnings))
         self.assertIn("Mon/Wed/Fri 9:00 AM-9:50 AM", format_schedule(sched))
 
     def test_classes_on_skips_online(self):

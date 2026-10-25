@@ -2,10 +2,10 @@ import asyncio
 import json
 import unittest
 
-from transit_buddy.agent import AgentService
-from transit_buddy.agent.dev_database import DEMO_GUILD, demo_database
-from transit_buddy.agent.extraction.schedule_extraction import extract_schedule, parse_json
-from transit_buddy.agent.skill_loader import load_skills, select_skills
+from src.agent import AgentService
+from src.agent.dev_database import DEMO_GUILD, demo_database
+from src.agent.extraction.schedule_extraction import extract_schedule, parse_json
+from src.agent.skill_loader import load_skills, select_skills
 
 from agent_helpers import MONDAY_7AM, ScriptedModel, get, tool_results
 
@@ -89,11 +89,17 @@ class ProcessMessage(unittest.TestCase):
         self.assertTrue(pend["confirmation_required"])
         self.assertEqual(pend["extracted_schedule"]["courses"][0]["meeting_patterns"][0]["start_time"], "09:00")
         self.assertIsNone(get(db, "get_student_schedule", DEMO_GUILD, "1001"))  # nothing persisted
-        saved = run(svc.save_confirmed_schedule("1001", DEMO_GUILD))
+        self.assertTrue(any("section number missing" in w for w in pend["validation_warnings"]))
+        with self.assertRaisesRegex(ValueError, r"CSE 110 \(course name, section number\)"):
+            run(svc.save_confirmed_schedule("1001", DEMO_GUILD))  # the student is asked for these first
+        fixed = svc.pending_schedule("1001")
+        fixed["courses"][0].update(course_name="Principles of Programming", section="12345")
+        saved = run(svc.save_confirmed_schedule("1001", DEMO_GUILD, fixed))
         self.assertEqual(saved.confirmation_status, "confirmed")
         self.assertEqual(get(db, "get_student_schedule", DEMO_GUILD, "1001")["courses"][0]["course_code"], "CSE 110")
+        self.assertIsNone(svc.pending_schedule("1001"))  # pending was cleared
         with self.assertRaises(ValueError):
-            run(svc.save_confirmed_schedule("1001", DEMO_GUILD))  # pending was cleared
+            run(svc.save_confirmed_schedule("1001", DEMO_GUILD))
 
     def test_save_preferences_rejects_addresses(self):
         svc, model = service([[("save_commute_preferences", {"general_origin_area": "1234 E Main St"})], "ok"])
@@ -148,7 +154,7 @@ class ConstraintParsing(unittest.TestCase):
     NAMES = {"1001": "you", "1002": "Priya", "1003": "Jordan Lee"}
 
     def parse(self, text):
-        from transit_buddy.agent.tools.agent_tools import parse_constraint
+        from src.agent.tools.agent_tools import parse_constraint
         return parse_constraint(text, "1001", self.NAMES)
 
     def test_sentences(self):
@@ -182,6 +188,26 @@ class Extraction(unittest.TestCase):
         r = run(extract_schedule(ScriptedModel(script=["I can't see a schedule"], seen=[]), b"x", "image/png"))
         self.assertEqual(r["extracted_schedule"]["courses"], [])
         self.assertIn("clearer", r["validation_warnings"][0])
+
+
+class TerminalChat(unittest.TestCase):
+    def test_cli_round_trip(self):
+        from unittest import mock
+        from src.agent import cli
+        svc, _ = service(["Hi there."])
+        lines = iter(["/mention 1002", "hello", "/confirm"])
+        out = []
+
+        def fake_input(prompt):
+            try:
+                return next(lines)
+            except StopIteration:
+                raise EOFError
+
+        with mock.patch("builtins.input", fake_input), mock.patch("builtins.print", lambda *a, **k: out.append(" ".join(map(str, a)))):
+            run(cli._loop(svc, "1001", [], DEMO_GUILD))
+        self.assertIn("Hi there.", out)
+        self.assertTrue(any(o.startswith("Not saved:") for o in out))
 
 
 class Skills(unittest.TestCase):
