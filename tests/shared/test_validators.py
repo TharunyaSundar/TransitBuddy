@@ -29,3 +29,16 @@ def test_course():
     assert is_valid_course(course)
     course["meeting_patterns"][0]["start_time"] = "9am"
     assert not is_valid_course(course)
+
+
+def test_course_name_and_section_optional():
+    course = {
+        "course_code": "CSE 565",
+        "location": "BYENG 210",
+        "meeting_patterns": [
+            {"day_of_week": "Monday", "start_time": "09:00", "end_time": "10:15"}
+        ],
+    }
+    assert is_valid_course(course)
+    assert is_valid_course({**course, "course_name": None, "section": None})
+    assert not is_valid_course({**course, "section": 123})
