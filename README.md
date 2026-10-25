@@ -58,14 +58,14 @@ flowchart LR
 
 ## Folder Structure
 
-- transit_buddy/__main__.py: application startup entry point (`python -m transit_buddy`).
-- transit_buddy/config/: environment configuration loader.
-- transit_buddy/discord_bot/: developer-owned Discord integration layer (named to avoid shadowing the `discord` library).
-- transit_buddy/database/: developer-owned MongoDB models, repositories, and services.
-- transit_buddy/agent/: developer-owned LangChain agent and LLM workflow code.
-- transit_buddy/skills/: Markdown skill templates for the agent.
-- transit_buddy/shared/: cross-team contracts, constants, and validators.
-- transit_buddy/utils/: utility modules such as logging.
+- src/__main__.py: application startup entry point (`python -m src`).
+- src/config/: environment configuration loader.
+- src/discord_bot/: developer-owned Discord integration layer (named to avoid shadowing the `discord` library).
+- src/database/: developer-owned MongoDB models, repositories, and services.
+- src/agent/: developer-owned LangChain agent and LLM workflow code.
+- src/skills/: Markdown skill templates for the agent.
+- src/shared/: cross-team contracts, constants, and validators.
+- src/utils/: utility modules such as logging.
 - docs/: architecture, responsibilities, development guide, and integration contracts.
 - tests/: test scaffolding for the three contributors.
 - scripts/: command registration and demo data setup scripts.
@@ -74,9 +74,9 @@ flowchart LR
 
 | Developer | Module | Branch | Responsibilities | Deliverables |
 | --- | --- | --- | --- | --- |
-| Developer 1 | transit_buddy/discord_bot/, tests/discord/ | feature/discord-bot | Build Discord app setup, command registration, mentions, screenshot handling, confirmation flows, and message forwarding to the agent. | Discord bot client, slash commands, handlers, tests |
-| Developer 2 | transit_buddy/database/, tests/database/ | feature/mongodb | Create MongoDB Atlas, Pydantic/PyMongo models, repositories, validation, schedule storage, and demo data. | Database models, services, seed script, tests |
-| Developer 3 | transit_buddy/agent/, transit_buddy/skills/, tests/agent/ | feature/langchain-agent | Configure LangChain, multimodal extraction, skill files, matching logic, and response generation. | Agent service, skills, extraction logic, tests |
+| Developer 1 | src/discord_bot/, tests/discord/ | feature/discord-bot | Build Discord app setup, command registration, mentions, screenshot handling, confirmation flows, and message forwarding to the agent. | Discord bot client, slash commands, handlers, tests |
+| Developer 2 | src/database/, tests/database/ | feature/mongodb | Create MongoDB Atlas, Pydantic/PyMongo models, repositories, validation, schedule storage, and demo data. | Database models, services, seed script, tests |
+| Developer 3 | src/agent/, src/skills/, tests/agent/ | feature/langchain-agent | Configure LangChain, multimodal extraction, skill files, matching logic, and response generation. | Agent service, skills, extraction logic, tests |
 
 ## Git Branching Strategy
 
@@ -119,7 +119,7 @@ Then fill in the required values when the relevant service is actually being use
 ### Start the application
 
 ```bash
-python -m transit_buddy
+python -m src
 ```
 
 Run tests:

@@ -1,6 +1,6 @@
 # Integration Contracts
 
-This document defines the service boundaries for the project. These interfaces are intentionally simple and designed for independent development on separate branches. The data models live in `transit_buddy/shared/contracts.py` (Pydantic, snake_case fields; timestamps are ISO-8601 strings).
+This document defines the service boundaries for the project. These interfaces are intentionally simple and designed for independent development on separate branches. The data models live in `src/shared/contracts.py` (Pydantic, snake_case fields; timestamps are ISO-8601 strings).
 
 ## DatabaseService
 

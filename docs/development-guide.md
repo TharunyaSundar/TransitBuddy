@@ -17,7 +17,7 @@ This guide explains how the project should be developed during the hackathon fou
 1. Clone the repository.
 2. Create a virtualenv and run `pip install -r requirements.txt`.
 3. Copy .env.example to .env when needed.
-4. Use `python -m transit_buddy` to verify the app starts in initialization mode.
+4. Use `python -m src` to verify the app starts in initialization mode.
 
 ## Branching
 
@@ -29,4 +29,4 @@ The Discord developer should not build database models. The MongoDB developer sh
 
 ## Shared Tooling
 
-The shared contracts in transit_buddy/shared/contracts.py and transit_buddy/shared/validators.py are the communication layer used by all three implementations. These files establish the expected object schema and default validations for daily functionality.
+The shared contracts in src/shared/contracts.py and src/shared/validators.py are the communication layer used by all three implementations. These files establish the expected object schema and default validations for daily functionality.

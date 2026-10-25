@@ -1,4 +1,4 @@
-from transit_buddy.config import is_configured, settings
+from src.config import is_configured, settings
 
 
 def test_defaults():
