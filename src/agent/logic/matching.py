@@ -31,7 +31,8 @@ def _modes_overlap(a: list[str] | None, b: list[str] | None) -> list[str]:
 def find_matches(me: dict, my_av: DayAvailability, others: list[tuple[dict, DayAvailability]],
                  direction: str = "to_campus", around: str | None = None,
                  tolerance_min: int = TIME_TOLERANCE_MIN) -> list[dict]:
-    """me / others: CommutePreferences dicts. Returns matches sorted best first, each with plain reasons."""
+    """me / others: student records (dicts) with the optional commute profile. Returns matches sorted best
+    first, each with plain reasons. Home addresses are never read here."""
     target = to_minutes(around) if around else None
     if target is None:
         t = my_av.arrive_by if direction == "to_campus" else my_av.earliest_leave_campus
@@ -43,7 +44,7 @@ def find_matches(me: dict, my_av: DayAvailability, others: list[tuple[dict, DayA
     for prefs, av in others:
         if prefs.get("discord_user_id") == me.get("discord_user_id"):
             continue
-        if not prefs.get("ride_sharing_opt_in"):
+        if not prefs.get("commute_match_opt_in"):
             continue  # never match a student who hasn't opted in
         if prefs.get("discord_guild_id") != me.get("discord_guild_id"):
             continue

@@ -103,7 +103,7 @@ def build_commute_group(get_agent: Callable[[], object]) -> app_commands.Group:
                                                display_names=_names(classmate1, classmate2, classmate3)),
                       private=not share)
 
-    @group.command(name="setup", description="Save your area, usual departure time, ride-sharing and home address.")
+    @group.command(name="setup", description="Save your home address, area, usual departure time and matching opt-in.")
     async def setup(interaction: discord.Interaction) -> None:
         agent = get_agent()
         if agent is None:
@@ -111,9 +111,9 @@ def build_commute_group(get_agent: Callable[[], object]) -> app_commands.Group:
             return
         await open_setup_form(interaction, agent)
 
-    @group.command(name="forget-address", description="Delete your saved home address.")
+    @group.command(name="forget-address", description="Delete your commute profile, including your home address.")
     async def forget_address(interaction: discord.Interaction) -> None:
         user, guild = str(interaction.user.id), str(interaction.guild_id)
-        await _answer(interaction, get_agent, lambda a: a.forget_home_address(user, guild))
+        await _answer(interaction, get_agent, lambda a: a.delete_commute_profile(user, guild))
 
     return group

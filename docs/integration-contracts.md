@@ -6,7 +6,9 @@ This document defines the service boundaries for the project. These interfaces a
 
 The DatabaseService contract is owned by the MongoDB developer and consumed by the agent developer. The service must manage student and schedule data scoped to a Discord guild.
 
-Collections: `students` and `schedules` only. Models: `Student` (includes the **required**, private `home_address`; a blank or missing value is rejected), `StudentSchedule` (`courses` -> `meeting_patterns`, `confirmation_status` is `pending_confirmation` or `confirmed`). See `contracts.py` for every field.
+Collections: `students` and `schedules` only. Models: `Student` (includes the **required**, private `home_address`; a blank or missing value is rejected; plus an optional commute profile: `general_origin_area`, `preferred_transport_modes`, `usual_departure_window` and `commute_match_opt_in`, default `False`), `StudentSchedule` (`courses` -> `meeting_patterns`, `confirmation_status` is `pending_confirmation` or `confirmed`). See `contracts.py` for every field.
+
+The home address is never shown to other students and is only used for that student's own trip times. Only students with `commute_match_opt_in = True` are ever matched with other students.
 
 ### Required methods
 
@@ -20,6 +22,12 @@ class DatabaseService(Protocol):
 
     async def get_student(self, discord_guild_id: str, discord_user_id: str) -> Student | None: ...
 
+    async def delete_student(self, discord_guild_id: str, discord_user_id: str) -> bool:
+        """Remove the student record (home address and commute profile). The schedule is separate and stays."""
+
+    async def get_opted_in_students(self, discord_guild_id: str) -> list[Student]:
+        """Students in the guild with commute_match_opt_in = True."""
+
     async def save_schedule(self, schedule: StudentSchedule) -> StudentSchedule:
         """Save or replace a student's schedule."""
 
@@ -30,8 +38,6 @@ class DatabaseService(Protocol):
     ) -> list[StudentSchedule]: ...
 
     async def delete_student_schedule(self, discord_guild_id: str, discord_user_id: str) -> bool: ...
-
-
 ```
 
 ### Error behavior

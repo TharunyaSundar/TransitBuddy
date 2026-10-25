@@ -45,15 +45,27 @@ DEMO_STUDENTS = [
 ]
 
 
+# Optional commute profile per demo student: (general area, transport, usual departure window, matching opt-in).
+DEMO_COMMUTE = {
+    "900000000000000001": ("Tempe Village", ["carpool", "rideshare"], "08:15-08:45", True),
+    "900000000000000002": ("Tempe Village", ["rideshare", "bus"], "08:00-08:30", True),
+    "900000000000000003": ("Downtown Phoenix", ["bus"], "07:45-08:15", False),
+    "900000000000000004": ("Mesa", ["carpool"], "09:00-09:30", True),
+}
+
+
 async def seed() -> None:
     await connect_database()
     db = DatabaseService()
 
     for user_id, name, home_address, courses in DEMO_STUDENTS:
+        area, modes, window, opt_in = DEMO_COMMUTE[user_id]
         await db.upsert_student(Student(
             discord_user_id=user_id, discord_guild_id=GUILD_ID, display_name=name,
             university=DEFAULT_UNIVERSITY, campus=DEFAULT_CAMPUS, timezone=DEFAULT_TIMEZONE,
             created_at="", updated_at="", home_address=home_address,
+            general_origin_area=area, preferred_transport_modes=modes, usual_departure_window=window,
+            commute_match_opt_in=opt_in,
         ))
         await db.save_schedule(StudentSchedule(
             discord_user_id=user_id, discord_guild_id=GUILD_ID, semester="Fall 2026",

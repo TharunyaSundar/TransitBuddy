@@ -97,19 +97,25 @@ class ProcessMessage(unittest.TestCase):
         with self.assertRaises(ValueError):
             run(svc.save_confirmed_schedule("1001", DEMO_GUILD))
 
-    def test_save_preferences_rejects_addresses(self):
-        svc, model = service([[("save_commute_preferences", {"general_origin_area": "1234 E Main St"})], "ok"])
+    def test_profile_update_rejects_addresses_and_needs_a_profile(self):
+        svc, model = service([[("update_my_commute_profile", {"general_origin_area": "1234 E Main St"})], "ok"])
         run(svc.process_message(ctx("I live at 1234 E Main St")))
         self.assertIn("street address", json.loads(tool_results(model)[0])["error"])
+        svc, model = service([[("update_my_commute_profile", {"general_origin_area": "Mesa"})], "ok"])
+        run(svc.process_message(ctx("I'm in Mesa", user="5005")))  # no student record yet
+        out = json.loads(tool_results(model)[0])
+        self.assertEqual(out["code"], "no_profile")
+        self.assertIn("Set up your commute", out["error"])
 
-    def test_ride_request_reaches_database_as_model(self):
+    def test_profile_update_keeps_the_rest(self):
         db = demo_database()
-        svc, model = service([[("create_ride_request", {"origin_area": "Mesa", "destination_area": "ASU Tempe campus",
-                                                         "desired_departure_time": "Tuesday 8:00 AM"})], "Posted."], db=db)
-        resp = run(svc.process_message(ctx("post a ride request from Mesa Tuesday 8am")))
-        rid = resp.metadata["ride_request_created"]
-        self.assertEqual(db.rides[rid].status, "open")  # stored as the shared RideRequest model
-        self.assertEqual(db.rides[rid].discord_user_id, "1001")
+        svc, model = service([[("update_my_commute_profile", {"usual_departure_window": "7:30am-8am",
+                                                              "commute_match_opt_in": False})], "Saved."], db=db)
+        run(svc.process_message(ctx("I leave 7:30-8 now, and stop matching me")))
+        self.assertTrue(json.loads(tool_results(model)[0])["ok"])
+        s = get(db, "get_student", DEMO_GUILD, "1001")
+        self.assertEqual((s["usual_departure_window"], s["commute_match_opt_in"], s["general_origin_area"],
+                          s["home_address"]), ("07:30-08:00", False, "Mesa", "1 E Main St, Mesa, AZ 85201"))
 
     def test_save_confirmed_rejects_bad_times(self):
         svc, _ = service([])
@@ -118,11 +124,6 @@ class ProcessMessage(unittest.TestCase):
                                                              "end_time": "09:50"}]}]}
         with self.assertRaises(ValueError):
             run(svc.save_confirmed_schedule("1001", DEMO_GUILD, bad))
-
-    def test_cannot_close_someone_elses_ride(self):
-        svc, model = service([[("update_my_ride_request", {"request_id": "r-demo1", "status": "cancelled"})], "no"])
-        run(svc.process_message(ctx("cancel ride r-demo1", user="1001")))
-        self.assertFalse(json.loads(tool_results(model)[0])["ok"])
 
     def test_no_database_is_explained(self):
         model = ScriptedModel(script=[[("get_my_schedule", {})], "The database isn't connected."], seen=[])
@@ -218,7 +219,7 @@ class TerminalChat(unittest.TestCase):
 class Skills(unittest.TestCase):
     def test_all_skills_load_with_tools(self):
         skills = load_skills()
-        self.assertEqual(len(skills), 4)
+        self.assertEqual(sorted(s.id for s in skills), ["availability", "commute-matching", "schedule-upload"])
         self.assertTrue(all("Tools needed" in s.sections and s.keywords for s in skills))
         self.assertEqual([s.id for s in select_skills(skills, "here is my class schedule screenshot")][0],
                          "schedule-upload")

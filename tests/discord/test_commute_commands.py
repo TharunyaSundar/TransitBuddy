@@ -86,16 +86,15 @@ def test_match_only_opted_in_same_area():
 
 def test_match_explains_limited_search_without_opted_in_query():
     class NoServerSearch(InMemoryDatabaseService):
-        get_opted_in_commute_preferences = None  # like Developer 2's DatabaseService today
+        get_opted_in_students = None  # a database without the server-wide opted-in query
 
     db = NoServerSearch()
     db.__dict__.update(demo_database().__dict__)
     out = reply(run("match", agent_for(db)))
-    assert "**Priya**" in out["content"]  # found through her open ride request
-    assert "I can only check classmates you add" in out["content"]
-    db.rides.clear()
-    out = reply(run("match", agent_for(db)))
     assert "No opted-in students from your area with similar times and a shared way to travel, going to campus on Monday." in out["content"]
+    assert "I can only check the classmates you added." in out["content"]
+    out = reply(run("match", agent_for(db), classmate1=member(1002)))
+    assert "**Priya**" in out["content"]  # added to the command, and opted in
 
 
 def test_match_without_saved_area():
@@ -159,7 +158,8 @@ def test_not_ready_and_failures_are_friendly():
 def test_plan_without_saved_departure_times_says_leave_by_not_midnight():
     # the screenshot case: nobody has a usual departure time, arrive by 8:00 AM, default 30-minute trip
     db = demo_database()
-    db.preferences.clear()
+    for key, s in db.students.items():
+        db.students[key] = s.model_copy(update={"usual_departure_window": None})
     out = reply(run("plan", agent_for(db), classmate1=member(1002, name="Priya"), day="saturday",
                     arrive_by="8:00 AM"))["content"]
     assert out.startswith("**Leave by 7:30 AM** on Saturday")

@@ -11,7 +11,10 @@ SCHEDULES = "schedules"
 _IDENTITY = [("discord_guild_id", ASCENDING), ("discord_user_id", ASCENDING)]
 
 INDEXES: dict[str, list[IndexModel]] = {
-    STUDENTS: [IndexModel(_IDENTITY, unique=True, name="guild_user_unique")],
+    STUDENTS: [
+        IndexModel(_IDENTITY, unique=True, name="guild_user_unique"),
+        IndexModel([("discord_guild_id", ASCENDING), ("commute_match_opt_in", ASCENDING)], name="guild_optin"),
+    ],
     SCHEDULES: [IndexModel(_IDENTITY, unique=True, name="guild_user_unique")],
 }
 

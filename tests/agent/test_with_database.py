@@ -12,13 +12,14 @@ import pytest
 from agent_helpers import MONDAY_7AM, ScriptedModel, tool_results
 from src.agent import AgentService
 from src.database import DatabaseService, connect_database, disconnect_database, get_database
-from src.shared.contracts import CommutePreferences, Course, MeetingPattern, Student, StudentSchedule
+from src.shared.contracts import Course, MeetingPattern, Student, StudentSchedule
 
 TEST_URI = os.getenv("TEST_MONGODB_URI")
 DB_NAME = "transit_buddy_agent_test"
 GUILD = "g-agent"
 pytestmark = pytest.mark.skipif(not TEST_URI, reason="TEST_MONGODB_URI not set")
 
+ADDRESS = "1 E Main St, Mesa, AZ 85201"  # a public place
 PEOPLE = [  # fictional students: (id, name, area, window, opted in, first class Monday)
     ("u1", "Alex", "Mesa", "08:00-08:30", True, "09:00"),
     ("u2", "Priya", "Mesa", "08:00-08:40", True, "09:05"),
@@ -30,17 +31,15 @@ async def seed(db: DatabaseService) -> None:
     for uid, name, area, window, opt_in, start in PEOPLE:
         await db.upsert_student(Student(discord_user_id=uid, discord_guild_id=GUILD, display_name=name,
                                         university="Arizona State University", campus="Tempe",
-                                        timezone="America/Phoenix", created_at="", updated_at=""))
+                                        timezone="America/Phoenix", created_at="", updated_at="", home_address=ADDRESS,
+                                        general_origin_area=area, preferred_transport_modes=["carpool"],
+                                        usual_departure_window=window, commute_match_opt_in=opt_in))
         await db.save_schedule(StudentSchedule(
             discord_user_id=uid, discord_guild_id=GUILD, semester="Fall 2026", confirmation_status="confirmed",
             updated_at="", courses=[Course(course_code="CSE 110", course_name="Principles of Programming",
                                            section="12345", location="Tempe - ISTB4 101",
                                            meeting_patterns=[MeetingPattern(day_of_week="Monday", start_time=start,
                                                                             end_time="09:50")])]))
-        await db.save_commute_preferences(CommutePreferences(
-            discord_user_id=uid, discord_guild_id=GUILD, general_origin_area=area,
-            general_destination_area="ASU Tempe campus", preferred_transport_modes=["carpool"],
-            usual_departure_window=window, ride_sharing_opt_in=opt_in))
 
 
 def scenario(fn):
@@ -88,37 +87,39 @@ def test_availability_and_group_departure():
     scenario(t)
 
 
-def test_partners_without_opted_in_query_use_mentions_and_rides():
+def test_partners_searched_server_wide_only_opted_in():
     async def t(db, make_agent):
-        # DatabaseService has no get_opted_in_commute_preferences: only @mentions and ride requests are searched
         agent, model = make_agent([[("find_commute_partners", {"day": "today"})], "ok"])
-        await agent.process_message(ctx("anyone heading in at 9?", mentioned=["u2", "u3"]))
-        matches = json.loads(tool_results(model)[0])["matches"]
-        assert [m["who"] for m in matches] == ["Priya"]  # Sam hasn't opted in
+        await agent.process_message(ctx("anyone heading in at 9?"))  # nobody @mentioned: whole-server search
+        result = json.loads(tool_results(model)[0])
+        assert result["searchedWholeServer"] is True
+        assert [m["who"] for m in result["matches"]] == ["Priya"]  # Sam hasn't opted in
+        agent, model = make_agent([[("find_commute_partners", {"day": "today"})], "ok"])
+        await agent.process_message(ctx("what about Sam?", mentioned=["u3"]))
+        assert "Sam" not in json.dumps(json.loads(tool_results(model)[0])["matches"])  # mentioned, still not opted in
     scenario(t)
 
 
-def test_preferences_and_ride_requests_persist():
+def test_profile_setup_update_and_delete_persist():
     async def t(db, make_agent):
-        agent, _ = make_agent([[("save_commute_preferences", {"general_origin_area": "Chandler",
-                                                              "usual_departure_window": "7:30am-8am"})], "Saved."])
+        agent, _ = make_agent([[("update_my_commute_profile", {"general_origin_area": "Chandler",
+                                                               "usual_departure_window": "7:30am-8am"})], "Saved."])
         await agent.process_message(ctx("I moved to Chandler, I leave 7:30-8"))
-        p = await db.get_commute_preferences(GUILD, "u1")
-        assert (p.general_origin_area, p.usual_departure_window, p.ride_sharing_opt_in) == ("Chandler", "07:30-08:00", True)
+        s = await db.get_student(GUILD, "u1")
+        assert (s.general_origin_area, s.usual_departure_window, s.commute_match_opt_in, s.home_address,
+                s.display_name) == ("Chandler", "07:30-08:00", True, ADDRESS, "Alex")
 
-        agent, _ = make_agent([[("create_ride_request", {"origin_area": "Chandler", "destination_area": "ASU Tempe campus",
-                                                         "desired_departure_time": "Monday 7:45 AM"})], "Posted."])
-        resp = await agent.process_message(ctx("post a ride request"))
-        rid = resp.metadata["ride_request_created"]
-        assert [r.request_id for r in await db.get_open_ride_requests(GUILD)] == [rid]
+        agent, _ = make_agent([])
+        text = await agent.save_commute_setup("u9", GUILD, "Tempe", "8-8:30 AM", "bus", "no",
+                                              "2000 E Rio Salado Pkwy, Tempe, AZ 85288", display_name="Riya")
+        assert "Home address: saved privately" in text
+        s = await db.get_student(GUILD, "u9")
+        assert (s.display_name, s.home_address, s.commute_match_opt_in) == \
+            ("Riya", "2000 E Rio Salado Pkwy, Tempe, AZ 85288", False)
 
-        agent, model = make_agent([[("update_my_ride_request", {"request_id": rid, "status": "cancelled"})], "Done."])
-        await agent.process_message(ctx("cancel it", user="u2"))  # not Priya's request
-        assert json.loads(tool_results(model)[0])["ok"] is False
-        agent, model = make_agent([[("update_my_ride_request", {"request_id": rid, "status": "cancelled"})], "Done."])
-        await agent.process_message(ctx("cancel it"))
-        assert json.loads(tool_results(model)[0])["ok"] is True
-        assert await db.get_open_ride_requests(GUILD) == []
+        assert "Deleted your commute profile" in await agent.delete_commute_profile("u1", GUILD)
+        assert await db.get_student(GUILD, "u1") is None
+        assert await db.get_student_schedule(GUILD, "u1") is not None  # the schedule stays
     scenario(t)
 
 

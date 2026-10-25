@@ -17,13 +17,11 @@ COURSE_WEEKDAYS = (
     "Sunday",
 )
 CONFIRMATION_STATUSES = ("pending_confirmation", "confirmed")
-RIDE_REQUEST_STATUSES = ("open", "matched", "cancelled", "completed")
 
 Weekday = Literal[
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
 ]
 ConfirmationStatus = Literal["pending_confirmation", "confirmed"]
-RideRequestStatus = Literal["open", "matched", "cancelled", "completed"]
 
 
 class Student(BaseModel):
@@ -37,6 +35,12 @@ class Student(BaseModel):
     updated_at: str
     # Required and private: never show it to other students.
     home_address: str
+    # Optional commute profile, saved with the home address from the private setup form. Only the general area
+    # and approximate times are ever shown to other students, and only if they opted in to matching.
+    general_origin_area: Optional[str] = None  # e.g. Mesa, Downtown Phoenix
+    preferred_transport_modes: list[str] = Field(default_factory=list)  # e.g. ["carpool", "bus"]
+    usual_departure_window: Optional[str] = None  # leaving for campus, 24-hour HH:mm-HH:mm, e.g. 08:00-08:30
+    commute_match_opt_in: bool = False  # True only if the student agreed to be matched with other students
 
     @field_validator("home_address")
     @classmethod
@@ -68,30 +72,6 @@ class StudentSchedule(BaseModel):
     courses: list[Course] = Field(default_factory=list)
     confirmation_status: ConfirmationStatus
     updated_at: str
-
-
-class CommutePreferences(BaseModel):
-    discord_user_id: str
-    discord_guild_id: str
-    general_origin_area: str
-    general_destination_area: str
-    preferred_transport_modes: list[str] = Field(default_factory=list)
-    usual_departure_window: str  # e.g. 08:00-09:00
-    ride_sharing_opt_in: bool
-    # Private: set only through the commute setup form and used only for this student's own travel times
-    # (sent to the trip planner). Never shown to other students or used for matching.
-    home_address: Optional[str] = None
-
-
-class RideRequest(BaseModel):
-    request_id: str
-    discord_user_id: str
-    discord_guild_id: str
-    origin_area: str
-    destination_area: str
-    desired_departure_time: str
-    status: RideRequestStatus
-    created_at: str
 
 
 class ProcessMessageContext(BaseModel):

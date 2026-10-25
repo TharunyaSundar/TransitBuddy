@@ -64,7 +64,7 @@ def match_text(r: dict) -> str:
         return r.get("error", "I couldn't look for partners right now.")
     where = "to campus" if r["direction"] == "to_campus" else "from campus"
     scope = "" if r.get("searchedWholeServer") else \
-        "\nI can only check classmates you add to the command and students with open ride requests."
+        "\nI can only check the classmates you added."
     if not r["matches"]:
         return (f"No opted-in students from your area with similar times and a shared way to travel, going "
                 f"{where} on {r['day']}.{scope}")
@@ -142,15 +142,21 @@ _STREETISH = re.compile(r"\d{2,}\s+\w+|\b(st|ave|rd|blvd|dr|apt|unit)\b|#", re.I
 
 
 def parse_setup(area: str, window: str, modes: str, opt_in: str, address: str) -> dict:
-    """Convert the commute setup form into CommutePreferences fields."""
+    """The commute setup form -> Student fields. The home address is required; the area is required only to be
+    matched with other students. Raises ValueError with a student-facing message."""
     from .logic.schedule import _start_end
+    address = (address or "").strip()
+    if not address:
+        raise ValueError("Add your home address. It's private and only used for your own trip times.")
+    if len(address) < 6 or not re.search(r"\d", address) or not re.search(r"[A-Za-z]", address):
+        raise ValueError("Enter a full street address (for example 123 E Main St, Mesa, AZ).")
+    if len(address) > 200:
+        raise ValueError("That address is too long.")
     area = (area or "").strip()
-    if not area:
-        raise ValueError("Add your general area (for example Mesa or Downtown Phoenix).")
-    if _STREETISH.search(area):
+    if area and _STREETISH.search(area):
         raise ValueError("The area should be general, like Mesa or North Tempe. Put your street address in the "
                          "home address box instead (it stays private).")
-    usual = ""
+    usual = None
     if (window or "").strip():
         parts = re.split(r"\s*(?:-|–|—|to)\s*", window.strip(), maxsplit=1)
         start, end = _start_end(parts[0], parts[1]) if len(parts) == 2 else (None, None)
@@ -159,28 +165,26 @@ def parse_setup(area: str, window: str, modes: str, opt_in: str, address: str) -
         usual = f"{start}-{end}"
     choice = (opt_in or "").strip().lower()
     if choice not in YES | NO:
-        raise ValueError("Answer yes or no to sharing rides with other students.")
-    address = (address or "").strip()
-    if address and (len(address) < 6 or not re.search(r"\d", address) or not re.search(r"[A-Za-z]", address)):
-        raise ValueError("Enter a full street address (for example 123 E Main St, Mesa, AZ), or leave it empty.")
-    if len(address) > 200:
-        raise ValueError("That address is too long.")
+        raise ValueError("Answer yes or no to being matched with other students.")
+    if choice in YES and not area:
+        raise ValueError("Add your general area (for example Mesa) so I can match you with students near you, "
+                         "or answer no.")
     mode_list = [m.strip().lower() for m in re.split(r"[,/;]|\band\b", modes or "") if m.strip()][:5]
-    return {"general_origin_area": area, "usual_departure_window": usual, "preferred_transport_modes": mode_list,
-            "ride_sharing_opt_in": choice in YES, "home_address": address or None}
+    return {"home_address": address, "general_origin_area": area or None, "usual_departure_window": usual,
+            "preferred_transport_modes": mode_list, "commute_match_opt_in": choice in YES}
 
 
 def setup_summary(setup: dict, travel_on: bool) -> str:
-    lines = ["Saved your commute setup:", f"- Area: {setup['general_origin_area']}"]
+    lines = ["Saved your commute setup:",
+             "- Home address: saved privately. Only used for your own trip times"
+             + ("." if travel_on else " (trip times are off on this bot, so plans use estimates).")]
+    if setup["general_origin_area"]:
+        lines.append(f"- Area: {setup['general_origin_area']}")
     if setup["usual_departure_window"]:
         lines.append(f"- Usually leave: {_window(setup['usual_departure_window'])}")
     if setup["preferred_transport_modes"]:
         lines.append(f"- Getting there: {', '.join(setup['preferred_transport_modes'])}")
-    lines.append(f"- Ride-sharing matches: {'on' if setup['ride_sharing_opt_in'] else 'off'}")
-    if setup["home_address"]:
-        lines.append("- Home address: saved privately. Only used for your own trip times"
-                     + ("." if travel_on else " (trip times are off on this bot, so plans use estimates)."))
-    else:
-        lines.append("- Home address: not saved (plans use estimated trip times)")
-    lines.append("Change it with the private commute setup form; leave the address blank to delete it.")
+    lines.append(f"- Commute matching: {'on' if setup['commute_match_opt_in'] else 'off'}")
+    lines.append("Change it with \"Set up your commute\" under /schedule view; \"Delete my commute profile\" there "
+                 "removes it.")
     return "\n".join(lines)

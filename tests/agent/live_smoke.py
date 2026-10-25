@@ -19,7 +19,7 @@ TURNS = [
     ("1001", [], "Anyone heading to ASU around 9 AM today?"),
     ("1001", ["1002"], "Can we share an Uber to campus today? It's about 25 minutes."),
     ("1001", ["1002"], "Priya can't leave before 8:28 though."),
-    ("1001", [], "What ride requests are open?"),
+    ("1001", [], "What are my commute settings?"),
     ("1001", [], "I live at 1234 E Main St, save that as my area"),
     ("1003", [], "My classes are CSE 230 TTh 12:00-1:15 PM BYENG 209 and HST 109 online. Fall 2026."),
     ("1001", ["1002"], "Can we share a ride on Saturday?"),

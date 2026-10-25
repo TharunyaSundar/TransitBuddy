@@ -122,11 +122,18 @@ def build_schedule_group(get_agent: Callable[[], object]) -> app_commands.Group:
             await interaction.response.send_message(NOT_READY, ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
+        user_id = str(interaction.user.id)
         try:
-            text = await agent.view_schedule(str(interaction.user.id), str(interaction.guild_id))
+            text = await agent.view_schedule(user_id, str(interaction.guild_id))
+            profile = await agent.commute_profile(user_id, str(interaction.guild_id))
         except Exception as error:
             log(f"Viewing schedule failed: {error}")
-            text = "I couldn't load your schedule right now. Please try again in a minute."
-        await interaction.followup.send(text, ephemeral=True)
+            await interaction.followup.send("I couldn't load your schedule right now. Please try again in a minute.",
+                                            ephemeral=True)
+            return
+        text += ("\n\nCommute profile: saved (home address private)." if profile else
+                 "\n\nNo commute profile yet: add your home address so I can work out your trip times.")
+        await interaction.followup.send(text, ephemeral=True,
+                                        view=SetupPromptView(agent, user_id, can_delete=bool(profile)))
 
     return group

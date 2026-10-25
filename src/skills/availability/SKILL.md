@@ -4,16 +4,16 @@
 Availability
 
 ## Description
-Determines when students are realistically available to leave campus based on their class schedules, stated departure windows, and ride-sharing coordination needs.
+Determines when students are realistically available to travel based on their class schedules, stated departure windows and trip times, and proposes one departure time for a group travelling together.
 
 ## Activation conditions
 - A user asks when a student can leave campus.
 - A user wants to negotiate departure times.
-- A ride-sharing scenario requires balancing multiple constraints.
+- A group travelling together needs one departure time that balances everyone's constraints.
 
 ## Required inputs
 - Class schedule and meeting patterns.
-- Student commute preferences.
+- Student commute profiles (usual departure window; home address only for their own trip time).
 - Stated time preferences or constraints.
 - Guild context and participant list.
 
@@ -27,12 +27,12 @@ Determines when students are realistically available to leave campus based on th
 - propose_group_departure (common window, or the best compromise and who would need to move).
 
 ## Keywords
-leave, leaving, available, availability, free, when, depart, departure, window, agree, negotiate, after, before, time
+leave, leaving, available, availability, free, when, depart, departure, window, agree, negotiate, after, before, time, together, group, share, uber, lyft, carpool
 
 ## Rules and constraints
 - A class ending at a given time does not automatically imply an immediate departure.
 - Actual commute availability is a separate concept from class availability.
-- Do not assume a student wants to share a ride without consent.
+- Do not assume a student wants to travel with others without consent; plan only with classmates the user named.
 - Keep the model conservative when the input is ambiguous.
 
 ## Example user requests

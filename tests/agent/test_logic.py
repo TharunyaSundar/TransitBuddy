@@ -110,7 +110,7 @@ class Availability(unittest.TestCase):
 
     def av(self, uid, day="Monday"):
         return day_availability(uid, get(self.db, "get_student_schedule", DEMO_GUILD, uid),
-                                get(self.db, "get_commute_preferences", DEMO_GUILD, uid), day)
+                                get(self.db, "get_student", DEMO_GUILD, uid), day)
 
     def test_class_vs_commute_availability(self):
         a = self.av("1001")
@@ -135,12 +135,12 @@ class Availability(unittest.TestCase):
 class Matching(unittest.TestCase):
     def test_only_opted_in_same_area_close_times(self):
         db = demo_database()
-        me = get(db, "get_commute_preferences", DEMO_GUILD, "1001")
+        me = get(db, "get_student", DEMO_GUILD, "1001")
 
         def av(uid):
             return day_availability(uid, get(db, "get_student_schedule", DEMO_GUILD, uid),
-                                    get(db, "get_commute_preferences", DEMO_GUILD, uid), "Monday")
-        others = [(get(db, "get_commute_preferences", DEMO_GUILD, u), av(u)) for u in ("1002", "1003", "1004")]
+                                    get(db, "get_student", DEMO_GUILD, uid), "Monday")
+        others = [(get(db, "get_student", DEMO_GUILD, u), av(u)) for u in ("1002", "1003", "1004")]
         matches = find_matches(me, av("1001"), others)
         # Priya: Mesa, opted in, on campus by 8:55 vs 8:50. Jordan: other area. Sam: not opted in.
         self.assertEqual([m["discord_user_id"] for m in matches], ["1002"])

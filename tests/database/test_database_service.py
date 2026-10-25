@@ -117,3 +117,32 @@ def test_only_students_and_schedules_collections_exist():
         names = set(await get_database().list_collection_names())
         assert names == {"students", "schedules"}
     in_db(t)
+
+
+@needs_db
+def test_commute_profile_fields_opted_in_and_delete():
+    async def t():
+        await db.upsert_student(student(u="a").model_copy(update={
+            "general_origin_area": "Mesa", "preferred_transport_modes": ["carpool"],
+            "usual_departure_window": "08:00-08:30", "commute_match_opt_in": True}))
+        await db.upsert_student(student(u="b"))  # address only: not opted in
+        await db.upsert_student(student(g="other", u="c").model_copy(update={"commute_match_opt_in": True}))
+        a = await db.get_student("g", "a")
+        assert (a.general_origin_area, a.preferred_transport_modes, a.usual_departure_window) == \
+            ("Mesa", ["carpool"], "08:00-08:30")
+        assert (await db.get_student("g", "b")).commute_match_opt_in is False
+        assert [s.discord_user_id for s in await db.get_opted_in_students("g")] == ["a"]  # not b, not other guild
+        # a partial update (only the fields set) keeps the rest of the profile
+        await db.upsert_student(Student.model_validate({
+            "discord_user_id": "a", "discord_guild_id": "g", "display_name": "A2", "university": "ASU",
+            "campus": "Tempe", "timezone": "America/Phoenix", "created_at": "", "updated_at": "",
+            "home_address": "9 New St, Mesa, AZ"}))
+        a = await db.get_student("g", "a")
+        assert (a.display_name, a.home_address, a.general_origin_area, a.commute_match_opt_in) == \
+            ("A2", "9 New St, Mesa, AZ", "Mesa", True)
+        await db.save_schedule(schedule(u="a"))
+        assert await db.delete_student("g", "a") is True
+        assert await db.get_student("g", "a") is None
+        assert await db.get_student_schedule("g", "a") is not None  # the schedule is separate and stays
+        assert await db.delete_student("g", "a") is False
+    in_db(t)

@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from ..shared.constants import DEFAULT_CAMPUS, DEFAULT_TIMEZONE, DEFAULT_UNIVERSITY
 from ..shared.contracts import AgentResponse, ProcessMessageContext, ScheduleExtractionResult, StudentSchedule
 from . import commute
 from . import db as dbcall
@@ -207,45 +208,53 @@ class AgentService:
         r.setdefault("direction", direction)
         return commute.plan_text(r)[:MAX_RESPONSE_CHARS]
 
-    # Commute setup form: area, usual departure time, transport, ride-sharing opt-in and private home address.
+    # Commute setup form: home address (required, private), area, usual departure time, transport, matching opt-in.
+
+    async def commute_profile(self, discord_user_id: str, discord_guild_id: str) -> dict | None:
+        """The student record (home address + commute profile), or None if they haven't set it up."""
+        return await dbcall.call(self.db, "get_student", discord_guild_id or "dm", discord_user_id)
 
     async def commute_setup_defaults(self, discord_user_id: str, discord_guild_id: str) -> dict:
-        """Saved preferences to pre-fill the setup form (the student's own, including their address)."""
-        p = await dbcall.call(self.db, "get_commute_preferences", discord_guild_id or "dm", discord_user_id) or {}
+        """Saved profile to pre-fill the setup form (the student's own, including their address)."""
+        p = await self.commute_profile(discord_user_id, discord_guild_id) or {}
         w = parse_window(p.get("usual_departure_window") or "")
         return {"area": p.get("general_origin_area") or "",
                 "window": f"{display(from_minutes(w[0]))}-{display(from_minutes(w[1]))}" if w else "",
                 "modes": ", ".join(p.get("preferred_transport_modes") or []),
-                "opt_in": "yes" if p.get("ride_sharing_opt_in") else "no",
+                "opt_in": "yes" if p.get("commute_match_opt_in") else "no",
                 "address": p.get("home_address") or ""}
 
-    async def save_commute_setup(self, discord_user_id: str, discord_guild_id: str, area: str, window: str = "",
-                                 modes: str = "", opt_in: str = "no", address: str = "") -> str:
-        """Validate and save the setup form. Raises ValueError with a message for the student.
-        An empty address removes a saved one. Returns a summary (never echoing the address)."""
+    async def save_commute_setup(self, discord_user_id: str, discord_guild_id: str, area: str = "", window: str = "",
+                                 modes: str = "", opt_in: str = "no", address: str = "",
+                                 display_name: str | None = None) -> str:
+        """Validate and save the setup form on the student record (home address required). Raises ValueError with
+        a message for the student. Returns a summary that never echoes the address."""
         setup = commute.parse_setup(area, window, modes, opt_in, address)
-        if setup["home_address"] and self.travel.enabled:
+        if self.travel.enabled:
             check = await self.travel.check_address(setup["home_address"], self.clock())
             if check == "not_found":
                 raise ValueError("The trip planner couldn't find that home address. Check the street, city and "
-                                 "state (e.g. 123 E Main St, Mesa, AZ), or leave it empty.")
+                                 "state (e.g. 123 E Main St, Mesa, AZ).")
             if check == "too_far":
                 raise ValueError("That address matched a place far from ASU Tempe. Add the city and state (e.g. "
-                                 "123 E Main St, Mesa, AZ) and check the spelling, or leave it empty.")
+                                 "123 E Main St, Mesa, AZ) and check the spelling.")
         guild = discord_guild_id or "dm"
-        old = await dbcall.call(self.db, "get_commute_preferences", guild, discord_user_id) or {}
-        await dbcall.call(self.db, "save_commute_preferences", {
-            "discord_user_id": discord_user_id, "discord_guild_id": guild,
-            "general_destination_area": old.get("general_destination_area") or "ASU Tempe campus", **setup})
+        old = await self.commute_profile(discord_user_id, guild) or {}
+        student = {"discord_user_id": discord_user_id, "discord_guild_id": guild,
+                   "display_name": display_name or old.get("display_name") or "Student",
+                   "university": old.get("university") or DEFAULT_UNIVERSITY,
+                   "campus": old.get("campus") or DEFAULT_CAMPUS,
+                   "timezone": old.get("timezone") or DEFAULT_TIMEZONE,
+                   "created_at": old.get("created_at") or "", "updated_at": "", **setup}
+        await dbcall.call(self.db, "upsert_student", student)
         return commute.setup_summary(setup, travel_on=self.travel.enabled)
 
-    async def forget_home_address(self, discord_user_id: str, discord_guild_id: str) -> str:
-        guild = discord_guild_id or "dm"
-        p = await dbcall.call(self.db, "get_commute_preferences", guild, discord_user_id)
-        if not p or not p.get("home_address"):
-            return "You don't have a home address saved."
-        await dbcall.call(self.db, "save_commute_preferences", {**p, "home_address": None})
-        return "Deleted your home address. Plans will use estimated trip times from now on."
+    async def delete_commute_profile(self, discord_user_id: str, discord_guild_id: str) -> str:
+        """Delete the student record: home address and commute profile. The schedule is separate and stays."""
+        if not await dbcall.call(self.db, "delete_student", discord_guild_id or "dm", discord_user_id):
+            return "You don't have a commute profile saved."
+        return ("Deleted your commute profile, including your home address. Your class schedule is still saved; "
+                "plans will use estimated trip times.")
 
     def discard_pending_schedule(self, discord_user_id: str) -> None:
         self.pending.pop(discord_user_id, None)

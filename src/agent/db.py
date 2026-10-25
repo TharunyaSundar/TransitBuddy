@@ -8,13 +8,11 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from ..shared.contracts import CommutePreferences, RideRequest, Student, StudentSchedule
+from ..shared.contracts import Student, StudentSchedule
 
 WRITE_MODELS = {
     "upsert_student": Student,
     "save_schedule": StudentSchedule,
-    "save_commute_preferences": CommutePreferences,
-    "create_ride_request": RideRequest,
 }
 
 

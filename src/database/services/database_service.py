@@ -19,6 +19,14 @@ class DatabaseService:
     async def get_student(self, discord_guild_id: str, discord_user_id: str) -> Student | None:
         return await repos.students.find(discord_guild_id, discord_user_id)
 
+    async def delete_student(self, discord_guild_id: str, discord_user_id: str) -> bool:
+        """Remove a student's profile (home address and commute settings). Their schedule is separate and stays."""
+        return await repos.students.delete(discord_guild_id, discord_user_id)
+
+    async def get_opted_in_students(self, discord_guild_id: str) -> list[Student]:
+        """Students in the guild who agreed to be matched with other students (uses the guild_optin index)."""
+        return await repos.students.find_where(discord_guild_id, commute_match_opt_in=True)
+
     async def save_schedule(self, schedule: StudentSchedule) -> StudentSchedule:
         _validate_schedule(schedule)
         return await repos.schedules.upsert(schedule)

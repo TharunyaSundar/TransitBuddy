@@ -42,18 +42,21 @@ def agent(db=None, travel=None, script=None):
 class ParseSetup(unittest.TestCase):
     def test_valid_form(self):
         s = parse_setup(" Mesa ", "3-3:30 PM", "carpool, bus and bike", "Yes", f" {ADDRESS} ")
-        self.assertEqual(s, {"general_origin_area": "Mesa", "usual_departure_window": "15:00-15:30",
-                             "preferred_transport_modes": ["carpool", "bus", "bike"], "ride_sharing_opt_in": True,
-                             "home_address": ADDRESS})
-        self.assertIsNone(parse_setup("Mesa", "", "", "no", "")["home_address"])  # empty address: none saved
+        self.assertEqual(s, {"home_address": ADDRESS, "general_origin_area": "Mesa",
+                             "usual_departure_window": "15:00-15:30",
+                             "preferred_transport_modes": ["carpool", "bus", "bike"], "commute_match_opt_in": True})
+        bare = parse_setup("", "", "", "no", ADDRESS)  # only the address: everything else optional
+        self.assertEqual((bare["general_origin_area"], bare["usual_departure_window"], bare["commute_match_opt_in"]),
+                         (None, None, False))
 
     def test_rejections(self):
-        for args, words in [(("", "", "", "no", ""), "general area"),
-                            (("123 E Main St", "", "", "no", ""), "should be general"),
-                            (("Mesa", "sometime", "", "no", ""), "range"),
-                            (("Mesa", "9:00-8:00 AM", "", "no", ""), "range"),
-                            (("Mesa", "", "", "maybe", ""), "yes or no"),
-                            (("Mesa", "", "", "no", "my house"), "street address")]:
+        for args, words in [(("Mesa", "", "", "no", ""), "Add your home address"),
+                            (("Mesa", "", "", "no", "my house"), "full street address"),
+                            (("123 E Main St", "", "", "no", ADDRESS), "should be general"),
+                            (("Mesa", "sometime", "", "no", ADDRESS), "range"),
+                            (("Mesa", "9:00-8:00 AM", "", "no", ADDRESS), "range"),
+                            (("Mesa", "", "", "maybe", ADDRESS), "yes or no"),
+                            (("", "", "", "yes", ADDRESS), "general area")]:  # matching needs an area
             with self.assertRaisesRegex(ValueError, words):
                 parse_setup(*args)
 
@@ -103,28 +106,35 @@ class Travel(unittest.TestCase):
 
 
 class SetupAndPrivacy(unittest.TestCase):
-    def test_save_defaults_forget(self):
+    def test_save_defaults_delete(self):
         db = demo_database()
         a = agent(db)
-        text = run(a.save_commute_setup("5005", DEMO_GUILD, "Tempe", "8-8:30 AM", "bus", "yes", ADDRESS))
+        text = run(a.save_commute_setup("5005", DEMO_GUILD, "Tempe", "8-8:30 AM", "bus", "yes", ADDRESS,
+                                        display_name="Riya"))
         self.assertIn("Home address: saved privately", text)
         self.assertNotIn("Rio Salado", text)  # the summary never echoes the address
-        saved = get(db, "get_commute_preferences", DEMO_GUILD, "5005")
-        self.assertEqual((saved["home_address"], saved["usual_departure_window"], saved["ride_sharing_opt_in"]),
-                         (ADDRESS, "08:00-08:30", True))
+        s = get(db, "get_student", DEMO_GUILD, "5005")
+        self.assertEqual((s["home_address"], s["usual_departure_window"], s["commute_match_opt_in"], s["display_name"],
+                          s["university"]), (ADDRESS, "08:00-08:30", True, "Riya", "Arizona State University"))
         self.assertEqual(run(a.commute_setup_defaults("5005", DEMO_GUILD)),
                          {"area": "Tempe", "window": "8:00 AM-8:30 AM", "modes": "bus", "opt_in": "yes",
                           "address": ADDRESS})
-        self.assertIn("Deleted your home address", run(a.forget_home_address("5005", DEMO_GUILD)))
-        self.assertIsNone(get(db, "get_commute_preferences", DEMO_GUILD, "5005")["home_address"])
-        self.assertIn("don't have a home address", run(a.forget_home_address("5005", DEMO_GUILD)))
+        self.assertIn("Deleted your commute profile", run(a.delete_commute_profile("5005", DEMO_GUILD)))
+        self.assertIsNone(get(db, "get_student", DEMO_GUILD, "5005"))
+        self.assertIn("don't have a commute profile", run(a.delete_commute_profile("5005", DEMO_GUILD)))
+
+    def test_delete_keeps_the_schedule(self):
+        db = demo_database()
+        run(agent(db).delete_commute_profile("1001", DEMO_GUILD))
+        self.assertIsNone(get(db, "get_student", DEMO_GUILD, "1001"))
+        self.assertIsNotNone(get(db, "get_student_schedule", DEMO_GUILD, "1001"))
 
     def test_unknown_address_is_not_saved(self):
         db = demo_database()
         a = agent(db, travel=TravelService(caller=planner(fail="not_found")))
         with self.assertRaisesRegex(ValueError, "couldn't find that home address"):
             run(a.save_commute_setup("5005", DEMO_GUILD, "Tempe", "", "", "no", "1 Nowhere Rd, Atlantis"))
-        self.assertIsNone(get(db, "get_commute_preferences", DEMO_GUILD, "5005"))
+        self.assertIsNone(get(db, "get_student", DEMO_GUILD, "5005"))
 
     def test_address_matched_far_away_is_rejected(self):
         # what Google did with "99999 Zzyzx Qwerty Blvd, Nowhereville": matched Zzyzx Rd, California
@@ -133,24 +143,24 @@ class SetupAndPrivacy(unittest.TestCase):
         self.assertEqual(run(a.travel.check_address("99999 Zzyzx Qwerty Blvd, Nowhereville, ZZ", MONDAY_7AM)), "too_far")
         with self.assertRaisesRegex(ValueError, "far from ASU Tempe"):
             run(a.save_commute_setup("5005", DEMO_GUILD, "Tempe", "", "", "no", "99999 Zzyzx Qwerty Blvd"))
-        self.assertIsNone(get(db, "get_commute_preferences", DEMO_GUILD, "5005"))
+        self.assertIsNone(get(db, "get_student", DEMO_GUILD, "5005"))
         self.assertEqual(run(TravelService(caller=planner()).check_address(ADDRESS, MONDAY_7AM)), "ok")  # Tempe
 
     def test_model_never_sees_the_address_and_chat_keeps_it(self):
         db = demo_database()
-        a = agent(db, script=[[("get_my_commute_preferences", {})], "ok",
-                              [("save_commute_preferences", {"general_origin_area": "Chandler"})], "ok"])
+        a = agent(db, script=[[("get_my_commute_profile", {})], "ok",
+                              [("update_my_commute_profile", {"general_origin_area": "Chandler"})], "ok"])
         run(a.save_commute_setup("1001", DEMO_GUILD, "Mesa", "", "", "yes", ADDRESS))
         model = a.model
         run(a.process_message({"message": "what are my settings?", "discord_user_id": "1001",
                                "discord_guild_id": DEMO_GUILD, "channel_id": "c"}))
         seen = tool_results(model)[0]
         self.assertNotIn("Rio Salado", seen)
-        self.assertEqual(json.loads(seen)["preferences"]["home_address"], "saved (private)")
+        self.assertEqual(json.loads(seen)["profile"]["home_address"], "saved (private)")
         run(a.process_message({"message": "I moved to Chandler", "discord_user_id": "1001",
                                "discord_guild_id": DEMO_GUILD, "channel_id": "c"}))
         self.assertNotIn("Rio Salado", tool_results(model)[0])
-        saved = get(db, "get_commute_preferences", DEMO_GUILD, "1001")
+        saved = get(db, "get_student", DEMO_GUILD, "1001")
         self.assertEqual((saved["general_origin_area"], saved["home_address"]), ("Chandler", ADDRESS))
 
 
@@ -159,24 +169,23 @@ class TravelInReplies(unittest.TestCase):
         db = demo_database()
         a = agent(db)
         run(a.save_commute_setup("1001", DEMO_GUILD, "Mesa", "8:00-8:30 AM", "bus", "yes", ADDRESS))
-        run(a.save_commute_setup("1002", DEMO_GUILD, "Mesa", "8:00-8:40 AM", "carpool", "yes", ADDRESS))
         text = run(a.commute_availability("1001", DEMO_GUILD, "Monday", ["1002"]))
         mine, theirs = [line for line in text.splitlines() if line.startswith("- ")]
         # first class CSE 110 at ISTB4 9:00 -> on campus by 8:50, 25 min by bus -> leave home by 8:25
         self.assertIn("leave home by 8:25 AM (25 min by bus or train to Interdisciplinary Science and "
                       "Technology IV, from the trip planner)", mine)
-        self.assertNotIn("leave home", theirs)  # never a classmate's home trip
+        self.assertNotIn("leave home", theirs)  # never a classmate's home trip, though Priya has an address
 
     def test_plan_uses_longest_home_trip(self):
         db = demo_database()
         a = agent(db, travel=TravelService(caller=planner({"DRIVE": 20, "TRANSIT": 25, "WALK": 50, "BICYCLE": 20})))
-        run(a.save_commute_setup("1001", DEMO_GUILD, "Mesa", "8:00-8:30 AM", "carpool", "yes", ADDRESS))
+        # Alex (bus) 25 min, Priya (carpool) 20 min: everyone leaves together, so the longer one counts
         text = run(a.commute_plan("1001", DEMO_GUILD, ["1002"], "Monday"))
-        self.assertIn("Based on a 20-minute trip: the longest trip from your saved homes, from the trip planner.", text)
-        self.assertIn("Everyone can leave between 8:00 AM and 8:30 AM.", text)  # 8:50 - 20 = 8:30
-        no_addresses = run(agent(demo_database()).commute_plan("1001", DEMO_GUILD, ["1002"], "Monday"))
-        self.assertIn("Assuming a 30-minute trip (an estimate: use the private commute setup form to save a home "
-                      "address", no_addresses)
+        self.assertIn("Based on a 25-minute trip: the longest trip from your saved homes, from the trip planner.", text)
+        self.assertIn("Everyone can leave between 8:00 AM and 8:25 AM.", text)  # 8:50 - 25 = 8:25
+        no_planner = run(agent(demo_database(), travel=TravelService(token="")).commute_plan(
+            "1001", DEMO_GUILD, ["1002"], "Monday"))
+        self.assertIn("Assuming a 30-minute trip (an estimate", no_planner)
         given = run(a.commute_plan("1001", DEMO_GUILD, ["1002"], "Monday", travel_minutes=15))
         self.assertIn("Based on a 15-minute trip.", given)
 

@@ -9,7 +9,7 @@ Discord (Developer 1) --AgentService--> agent (this folder) --DatabaseService-->
 
 The model handles the conversation and chooses tools. The rules that must be right are plain Python with tests:
 schedule cleanup and validation, availability, partner matching and group negotiation (`logic/`). Tools return
-only general areas and approximate times for other students, and only students who opted in are matched.
+only general areas and approximate times for other students, and only students who opted in to commute matching are matched.
 
 ## For Developer 1 (Discord)
 
@@ -65,37 +65,40 @@ await connect_database()                      # MONGODB_URI / MONGODB_DATABASE f
 agent = AgentService(DatabaseService())
 ```
 
-How the agent works with `src/database`:
-- Every write is validated into the shared model (`StudentSchedule`, `CommutePreferences`, `RideRequest`) before
-  it reaches `DatabaseService`, and results are read back with `model_dump()` (`agent/db.py`).
+How the agent works with `src/database` (collections `students` and `schedules` only):
+- Every write is validated into the shared model (`Student`, `StudentSchedule`) before it reaches
+  `DatabaseService`, and results are read back with `model_dump()` (`agent/db.py`).
 - `save_schedule` only accepts courses that pass the shared `is_valid_course`: a course code, a location and
   valid meeting times (course name and section are optional). The agent applies the same check, and
   `save_confirmed_schedule` raises `ValueError` saying which class needs what, so Discord can ask the student.
-- `create_ride_request` sends an empty `request_id`, and the database assigns it.
+- A student's commute profile lives on their `Student` record: the required, private `home_address` plus the
+  optional `general_origin_area`, `preferred_transport_modes`, `usual_departure_window` and
+  `commute_match_opt_in`. `upsert_student` writes only the fields the agent sets, so a partial change keeps the
+  rest. Students without a record still get schedules and plans, with estimated trip times.
+- "Anyone heading to campus at 9?" searches `get_opted_in_students` (the whole server) plus anyone @mentioned,
+  and only ever matches students with `commute_match_opt_in`.
 - If MongoDB is down or not connected, the tool reports a database problem and the agent tells the student;
   the reply doesn't crash.
-- The contract has no "all opted-in students in a server" query, so "anyone heading to campus at 9?" only
-  searches @mentioned students and students with open ride requests. Adding
-  `async get_opted_in_commute_preferences(discord_guild_id) -> list[CommutePreferences]` to `DatabaseService`
-  (the `guild_optin` index already exists) would let it search the whole server; the agent uses it
-  automatically when it's there.
 
 `dev_database.py` is an in-memory version of the same contract with four fictional students, for tests and
 for the terminal chat without MongoDB.
 
 ## Commute setup and home addresses
 
-The "Set up your commute" button shown after a schedule is saved opens a private form: general area, usual
-departure time, transport, ride-sharing opt-in and an optional home address. It's saved with
-`save_commute_setup`, which validates every field; `forget_home_address` deletes the address.
+The "Set up your commute" button, under `/schedule view` and right after a schedule is saved, opens a private
+form: home address (required), general area, usual departure time, transport and the commute-matching opt-in.
+It's saved on the student record with `save_commute_setup`, which validates every field (an address the trip
+planner can't find, or that matches a place more than 100 km from campus, is rejected). The "Delete my commute
+profile" button under `/schedule view` calls `delete_commute_profile`, which deletes the student record (the
+address is required, so it can't just be blanked); the schedule is separate and stays.
 
-The address is stored in `CommutePreferences.home_address` and is private:
+The address is private:
 - it's only used for the student's own trip times (`travel.py`): home to their first class building, from the
   team's Never Late trip planner (`NEVER_LATE_TOKEN`), with buildings from the verified
   `data/asu-buildings.json` (unknown buildings fall back to the Memorial Union, and the reply says so);
-- it's never shown to other students, used for matching, logged, or sent to the language model (the
-  preference tools show it as "saved (private)");
-- Availability adds "leave home by" for the student only, and group planning uses the longest trip among members
+- it's never shown to other students, used for matching, logged, or sent to the language model (the profile
+  tool shows it as "saved (private)");
+- availability adds "leave home by" for the student only, and group planning uses the longest trip among members
   with a saved address (everyone leaves together); without addresses it's a 30-minute estimate, and every reply
   says which.
 
@@ -108,8 +111,7 @@ The address is stored in `CommutePreferences.home_address` and is private:
 | `get_availability` | On campus by, classes over at, usual window: the student plus anyone @mentioned |
 | `find_commute_partners` | Opted-in students, same general area, times within 30 minutes |
 | `propose_group_departure` | Common departure window, or the best compromise and who would have to move by how much |
-| `get_my_commute_preferences` / `save_commute_preferences` | General area only (street addresses are refused), modes, window, opt-in |
-| `list_open_ride_requests` / `create_ride_request` / `update_my_ride_request` | Ride requests (students can only change their own) |
+| `get_my_commute_profile` / `update_my_commute_profile` | Area (street addresses refused), transport, usual window, matching opt-in; the address only via the form |
 
 Skills are `src/skills/*/SKILL.md`. Each skill's description always goes into the prompt; the full rules go in
 only for the one or two skills that match the message, to keep token use low.

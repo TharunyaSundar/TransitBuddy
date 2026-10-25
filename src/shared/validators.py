@@ -1,7 +1,7 @@
 import re
 from typing import Any
 
-from .contracts import CONFIRMATION_STATUSES, COURSE_WEEKDAYS, RIDE_REQUEST_STATUSES
+from .contracts import CONFIRMATION_STATUSES, COURSE_WEEKDAYS
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
@@ -16,10 +16,6 @@ def is_valid_weekday(value: Any) -> bool:
 
 def is_valid_confirmation_status(value: Any) -> bool:
     return isinstance(value, str) and value in CONFIRMATION_STATUSES
-
-
-def is_valid_ride_request_status(value: Any) -> bool:
-    return isinstance(value, str) and value in RIDE_REQUEST_STATUSES
 
 
 def is_valid_time_string(value: Any) -> bool:

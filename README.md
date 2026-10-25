@@ -12,7 +12,7 @@ University students often have different class times, transit constraints, and d
 
 ## Proposed Solution
 
-Transit Buddy combines a Discord interface, a MongoDB-backed data layer, and a LangChain-based agent with skill files. Students can upload class schedules, confirm the extracted details, and store them in a structured data model. The agent reads skill instructions, accesses schedule and preference data through shared service contracts, and generates recommendations for ride coordination, commute matching, and schedule-based availability discussions.
+Transit Buddy combines a Discord interface, a MongoDB-backed data layer, and a LangChain-based agent with skill files. Students can upload class schedules, confirm the extracted details, and store them in a structured data model. The agent reads skill instructions, accesses schedule and preference data through shared service contracts, and generates recommendations for commute matching, shared departure times, and schedule-based availability discussions.
 
 ## Key Features
 
@@ -22,7 +22,7 @@ Transit Buddy combines a Discord interface, a MongoDB-backed data layer, and a L
 - Schedule confirmation before persistence
 - Student schedule storage
 - Commute matching between compatible students
-- Ride-sharing coordination
+- Commute partner matching (opted-in students from the same area)
 - Group constraint negotiation
 
 ### Implemented in the foundation
@@ -39,7 +39,7 @@ Transit Buddy combines a Discord interface, a MongoDB-backed data layer, and a L
 
 - Python 3.11+: runtime environment for the bot and project scripts.
 - discord.py: Discord client, command handling, and bot interactions.
-- MongoDB Atlas: cloud database for student, schedule, commute, and ride data.
+- MongoDB Atlas: cloud database for students (private home address and optional commute profile) and schedules.
 - PyMongo + Pydantic: MongoDB access and schema validation for persisted documents.
 - LangChain (Python): orchestration for agent behavior and multimodal processing workflows.
 - python-dotenv: environment variable management for local configuration.

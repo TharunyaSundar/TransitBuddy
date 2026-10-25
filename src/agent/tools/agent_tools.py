@@ -8,7 +8,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from langchain.tools import ToolRuntime, tool
@@ -61,8 +61,17 @@ async def _availability(ctx: AgentContext, user_id: str, day: str):
     sched = await dbcall.call(ctx.db, "get_student_schedule", ctx.discord_guild_id, user_id)
     if sched and sched.get("confirmation_status") != "confirmed":
         sched = None  # unconfirmed schedules are never used for planning
-    prefs = await dbcall.call(ctx.db, "get_commute_preferences", ctx.discord_guild_id, user_id)
-    return day_availability(user_id, sched, prefs, day), prefs, sched
+    profile = await _profile(ctx, user_id)
+    return day_availability(user_id, sched, profile, day), profile, sched
+
+
+async def _profile(ctx: AgentContext, user_id: str) -> dict | None:
+    """The student record: home address (private) plus the optional commute profile. None if not set up."""
+    return await dbcall.call(ctx.db, "get_student", ctx.discord_guild_id, user_id)
+
+
+SETUP_HINT = ("They can add it with the private \"Set up your commute\" form: the button under /schedule view "
+              "(or after saving a schedule).")
 
 
 def _guarded(fn):
@@ -156,17 +165,12 @@ async def find_commute_partners(runtime: ToolRuntime[AgentContext], day: str = "
     my_av, my_prefs, _ = await _availability(ctx, ctx.discord_user_id, d)
     if not my_prefs or not my_prefs.get("general_origin_area"):
         return _out({"ok": False, "code": "need_area",
-                     "error": "I need their general area first (e.g. Mesa, Downtown Phoenix). Ask, "
-                              "then save_commute_preferences."})
+                     "error": f"I need their general area first (e.g. Mesa, Downtown Phoenix). {SETUP_HINT}"})
     candidates: dict[str, dict] = {}
-    whole_server = dbcall.has(ctx.db, "get_opted_in_commute_preferences")
-    if whole_server:
-        for p in await dbcall.call(ctx.db, "get_opted_in_commute_preferences", ctx.discord_guild_id) or []:
-            candidates[p["discord_user_id"]] = p
-    others = set(ctx.mentioned_user_ids) | {r["discord_user_id"] for r in
-                                            await dbcall.call(ctx.db, "get_open_ride_requests", ctx.discord_guild_id) or []}
-    for uid in others - set(candidates):
-        p = await dbcall.call(ctx.db, "get_commute_preferences", ctx.discord_guild_id, uid)
+    for p in await dbcall.call(ctx.db, "get_opted_in_students", ctx.discord_guild_id) or []:
+        candidates[p["discord_user_id"]] = p
+    for uid in set(ctx.mentioned_user_ids) - set(candidates):  # still only matched if they opted in
+        p = await _profile(ctx, uid)
         if p:
             candidates[uid] = p
     pairs = []
@@ -180,8 +184,8 @@ async def find_commute_partners(runtime: ToolRuntime[AgentContext], day: str = "
     for m in matches:
         m["who"] = await _name(ctx, m.pop("discord_user_id"))
     return _out({"ok": True, "day": d, "direction": direction, "matches": matches[:5],
-                 "searchedWholeServer": whole_server,
-                 "note": "Only students who opted in to ride-sharing are included. Ask before connecting them."})
+                 "searchedWholeServer": dbcall.has(ctx.db, "get_opted_in_students"),
+                 "note": "Only students who opted in to commute matching are included. Ask before connecting them."})
 
 
 DEFAULT_TRAVEL_MIN = 30
@@ -331,15 +335,15 @@ async def propose_group_departure(runtime: ToolRuntime[AgentContext], day: str =
 
 @tool
 @_guarded
-async def get_my_commute_preferences(runtime: ToolRuntime[AgentContext]) -> str:
-    """Get the user's saved commute preferences (general area, modes, usual departure window, opt-in)."""
+async def get_my_commute_profile(runtime: ToolRuntime[AgentContext]) -> str:
+    """Get the user's saved commute profile: general area, transport, usual departure window, matching opt-in,
+    and whether a home address is saved (the address itself is private and never shown)."""
     ctx = runtime.context
-    p = await dbcall.call(ctx.db, "get_commute_preferences", ctx.discord_guild_id, ctx.discord_user_id)
+    p = await _profile(ctx, ctx.discord_user_id)
     if not p:
-        return _out({"ok": False, "error": "No preferences saved yet. Ask the student for their general area, "
-                                           "usual departure window, transport modes, and ride-sharing opt-in."})
-    p = {**p, "home_address": "saved (private)" if p.get("home_address") else "not saved"}  # never the address
-    return _out({"ok": True, "preferences": p})
+        return _out({"ok": False, "error": f"No commute profile saved yet. {SETUP_HINT}"})
+    keys = ("general_origin_area", "preferred_transport_modes", "usual_departure_window", "commute_match_opt_in")
+    return _out({"ok": True, "profile": {**{k: p.get(k) for k in keys}, "home_address": "saved (private)"}})
 
 
 _ADDRESS = re.compile(r"\d{2,}\s+\w+|\b(st|ave|rd|blvd|dr|apt|unit|#)\b", re.I)
@@ -347,81 +351,41 @@ _ADDRESS = re.compile(r"\d{2,}\s+\w+|\b(st|ave|rd|blvd|dr|apt|unit|#)\b", re.I)
 
 @tool
 @_guarded
-async def save_commute_preferences(runtime: ToolRuntime[AgentContext], general_origin_area: str | None = None,
-                                   general_destination_area: str | None = None,
-                                   preferred_transport_modes: list[str] | None = None,
-                                   usual_departure_window: str | None = None,
-                                   ride_sharing_opt_in: bool | None = None) -> str:
-    """Save what the user told you about their commute. Pass only what they said.
-    general_origin_area: a general area like "Mesa" or "Downtown Phoenix", never a street address.
+async def update_my_commute_profile(runtime: ToolRuntime[AgentContext], general_origin_area: str | None = None,
+                                    preferred_transport_modes: list[str] | None = None,
+                                    usual_departure_window: str | None = None,
+                                    commute_match_opt_in: bool | None = None) -> str:
+    """Change what the user told you about their commute. Pass only what they said. Needs a saved profile
+    (home address) first. general_origin_area: a general area like "Mesa", never a street address.
     preferred_transport_modes: e.g. ["carpool", "bus"]. usual_departure_window: e.g. "08:00-08:30".
-    ride_sharing_opt_in: only true if they clearly agreed to be matched with other students."""
+    commute_match_opt_in: only true if they clearly agreed to be matched with other students."""
     ctx = runtime.context
+    old = await _profile(ctx, ctx.discord_user_id)
+    if not old:
+        return _out({"ok": False, "code": "no_profile",
+                     "error": f"Their profile needs a home address before anything else can be saved. {SETUP_HINT}"})
     if general_origin_area and _ADDRESS.search(general_origin_area):
         return _out({"ok": False, "error": "That looks like a street address. Ask for a general area instead "
                                            "(neighborhood or city), for privacy."})
-    if usual_departure_window and not parse_window(usual_departure_window):
-        return _out({"ok": False, "error": "usual_departure_window must look like 08:00-08:30"})
-    old = await dbcall.call(ctx.db, "get_commute_preferences", ctx.discord_guild_id, ctx.discord_user_id) or {}
-    w = parse_window(usual_departure_window) if usual_departure_window else None
-    prefs = {
-        "discord_user_id": ctx.discord_user_id, "discord_guild_id": ctx.discord_guild_id,
-        "general_origin_area": general_origin_area or old.get("general_origin_area", ""),
-        "general_destination_area": general_destination_area or old.get("general_destination_area") or "ASU Tempe campus",
-        "preferred_transport_modes": preferred_transport_modes or old.get("preferred_transport_modes", []),
-        "usual_departure_window": f"{from_minutes(w[0])}-{from_minutes(w[1])}" if w else old.get("usual_departure_window", ""),
-        "ride_sharing_opt_in": ride_sharing_opt_in if ride_sharing_opt_in is not None else old.get("ride_sharing_opt_in", False),
-        "home_address": old.get("home_address"),  # only the private commute setup form changes the address
-    }
-    saved = await dbcall.call(ctx.db, "save_commute_preferences", prefs)
-    shown = {**(saved or prefs), "home_address": "saved (private)" if prefs["home_address"] else "not saved"}
-    return _out({"ok": True, "saved": shown})
-
-
-@tool
-@_guarded
-async def list_open_ride_requests(runtime: ToolRuntime[AgentContext]) -> str:
-    """Open ride requests in this server (general areas and times only)."""
-    ctx = runtime.context
-    rows = await dbcall.call(ctx.db, "get_open_ride_requests", ctx.discord_guild_id) or []
-    out = [{"request_id": r["request_id"], "who": await _name(ctx, r["discord_user_id"]), "from": r["origin_area"],
-            "to": r["destination_area"], "when": r["desired_departure_time"]} for r in rows]
-    return _out({"ok": True, "requests": out})
-
-
-@tool
-@_guarded
-async def create_ride_request(origin_area: str, destination_area: str, desired_departure_time: str,
-                              runtime: ToolRuntime[AgentContext]) -> str:
-    """Post a ride request for the user, only when they asked to. Use general areas, never addresses.
-    desired_departure_time: e.g. "Monday 8:15 AM"."""
-    ctx = runtime.context
-    if _ADDRESS.search(origin_area) or _ADDRESS.search(destination_area):
-        return _out({"ok": False, "error": "Use general areas (e.g. Mesa, ASU Tempe campus), not addresses."})
-    req = {"request_id": "", "discord_user_id": ctx.discord_user_id, "discord_guild_id": ctx.discord_guild_id,
-           "origin_area": origin_area, "destination_area": destination_area,
-           "desired_departure_time": desired_departure_time, "status": "open",
-           "created_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat()}
-    saved = await dbcall.call(ctx.db, "create_ride_request", req)  # DatabaseService assigns request_id
-    ctx.events["ride_request_created"] = (saved or req)["request_id"]
-    return _out({"ok": True, "request": saved or req})
-
-
-@tool
-@_guarded
-async def update_my_ride_request(request_id: str, status: str, runtime: ToolRuntime[AgentContext]) -> str:
-    """Mark one of the user's own open ride requests as matched, cancelled or completed."""
-    ctx = runtime.context
-    if status not in ("matched", "cancelled", "completed"):
-        return _out({"ok": False, "error": "status must be matched, cancelled or completed"})
-    mine = [r for r in await dbcall.call(ctx.db, "get_open_ride_requests", ctx.discord_guild_id) or []
-            if r["request_id"] == request_id and r["discord_user_id"] == ctx.discord_user_id]
-    if not mine:
-        return _out({"ok": False, "error": "No open ride request with that ID belongs to this user."})
-    r = await dbcall.call(ctx.db, "update_ride_request_status", request_id, status)
-    return _out({"ok": bool(r), "request": r})
+    changes = {}
+    if general_origin_area:
+        changes["general_origin_area"] = general_origin_area.strip()
+    if preferred_transport_modes is not None:
+        changes["preferred_transport_modes"] = [m.strip().lower() for m in preferred_transport_modes if m.strip()][:5]
+    if usual_departure_window:
+        w = parse_window(usual_departure_window)
+        if not w:
+            return _out({"ok": False, "error": "usual_departure_window must look like 08:00-08:30"})
+        changes["usual_departure_window"] = f"{from_minutes(w[0])}-{from_minutes(w[1])}"
+    if commute_match_opt_in is not None:
+        changes["commute_match_opt_in"] = commute_match_opt_in
+    if not changes:
+        return _out({"ok": False, "error": "Nothing to change."})
+    keep = ("discord_user_id", "discord_guild_id", "display_name", "university", "campus", "timezone",
+            "created_at", "updated_at", "home_address")  # required fields, unchanged
+    await dbcall.call(ctx.db, "upsert_student", {**{k: old[k] for k in keep}, **changes})
+    return _out({"ok": True, "saved": changes})
 
 
 ALL_TOOLS = [get_my_schedule, prepare_schedule_from_text, get_availability, find_commute_partners,
-             propose_group_departure, get_my_commute_preferences, save_commute_preferences,
-             list_open_ride_requests, create_ride_request, update_my_ride_request]
+             propose_group_departure, get_my_commute_profile, update_my_commute_profile]

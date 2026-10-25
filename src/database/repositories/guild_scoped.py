@@ -52,7 +52,7 @@ class GuildScopedRepository(Generic[M]):
         return self._model.model_validate(strip_id(doc)) if doc else None
 
     async def find_where(self, discord_guild_id: str, **filters) -> list[M]:
-        """All documents in one guild matching the given field values (e.g. ride_sharing_opt_in=True)."""
+        """All documents in one guild matching the given field values (e.g. commute_match_opt_in=True)."""
         require(discord_guild_id=discord_guild_id)
         cursor = self._collection().find({"discord_guild_id": discord_guild_id, **filters})
         return [self._model.model_validate(strip_id(d)) async for d in cursor]
