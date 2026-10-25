@@ -336,7 +336,8 @@ async def get_my_commute_preferences(runtime: ToolRuntime[AgentContext]) -> str:
     ctx = runtime.context
     p = await dbcall.call(ctx.db, "get_commute_preferences", ctx.discord_guild_id, ctx.discord_user_id)
     if not p:
-        return _out({"ok": False, "error": "No preferences saved yet. They can save them with /commute setup."})
+        return _out({"ok": False, "error": "No preferences saved yet. Ask the student for their general area, "
+                                           "usual departure window, transport modes, and ride-sharing opt-in."})
     p = {**p, "home_address": "saved (private)" if p.get("home_address") else "not saved"}  # never the address
     return _out({"ok": True, "preferences": p})
 
@@ -370,7 +371,7 @@ async def save_commute_preferences(runtime: ToolRuntime[AgentContext], general_o
         "preferred_transport_modes": preferred_transport_modes or old.get("preferred_transport_modes", []),
         "usual_departure_window": f"{from_minutes(w[0])}-{from_minutes(w[1])}" if w else old.get("usual_departure_window", ""),
         "ride_sharing_opt_in": ride_sharing_opt_in if ride_sharing_opt_in is not None else old.get("ride_sharing_opt_in", False),
-        "home_address": old.get("home_address"),  # only /commute setup changes the private address
+        "home_address": old.get("home_address"),  # only the private commute setup form changes the address
     }
     saved = await dbcall.call(ctx.db, "save_commute_preferences", prefs)
     shown = {**(saved or prefs), "home_address": "saved (private)" if prefs["home_address"] else "not saved"}

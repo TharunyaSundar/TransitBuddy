@@ -175,7 +175,8 @@ class TravelInReplies(unittest.TestCase):
         self.assertIn("Based on a 20-minute trip: the longest trip from your saved homes, from the trip planner.", text)
         self.assertIn("Everyone can leave between 8:00 AM and 8:30 AM.", text)  # 8:50 - 20 = 8:30
         no_addresses = run(agent(demo_database()).commute_plan("1001", DEMO_GUILD, ["1002"], "Monday"))
-        self.assertIn("Assuming a 30-minute trip (an estimate: save a home address with /commute setup", no_addresses)
+        self.assertIn("Assuming a 30-minute trip (an estimate: use the private commute setup form to save a home "
+                      "address", no_addresses)
         given = run(a.commute_plan("1001", DEMO_GUILD, ["1002"], "Monday", travel_minutes=15))
         self.assertIn("Based on a 15-minute trip.", given)
 

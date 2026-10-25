@@ -78,7 +78,7 @@ class CommutePreferences(BaseModel):
     preferred_transport_modes: list[str] = Field(default_factory=list)
     usual_departure_window: str  # e.g. 08:00-09:00
     ride_sharing_opt_in: bool
-    # Private: set only through /commute setup and used only for this student's own travel times
+    # Private: set only through the commute setup form and used only for this student's own travel times
     # (sent to the trip planner). Never shown to other students or used for matching.
     home_address: Optional[str] = None
 

@@ -41,16 +41,17 @@ text = agent.format_schedule(result.extracted_schedule)  # short list to show wi
 await agent.save_confirmed_schedule(user_id, guild_id)            # or pass an edited schedule as 3rd arg
 agent.discard_pending_schedule(user_id)                           # Edit / Cancel button
 text = await agent.view_schedule(user_id, guild_id)              # saved + pending schedule, for /schedule view
-# /commute commands: structured input, answered without the language model
+# Structured commute service methods, answered without the language model
 text = await agent.commute_availability(user_id, guild_id, "today", classmate_ids)
 text = await agent.commute_match(user_id, guild_id, "today", "to_campus", "9:00 AM", classmate_ids)
 text = await agent.commute_plan(user_id, guild_id, classmate_ids, "today", "to_campus", travel_minutes=25,
                                 arrive_by=None, constraints="Priya can't leave before 8:30 AM")
 ```
 
-The agent never sends Discord messages and never saves an unconfirmed schedule. `/schedule upload` and
-`/schedule view` (`src/discord_bot/commands/schedule.py`) and the `/commute` commands
-(`src/discord_bot/commands/commute.py`) are working examples of these calls.
+The agent never sends Discord messages and never saves an unconfirmed schedule. The available slash commands
+are `/ask`, `/schedule upload`, and `/schedule view`; the schedule commands are implemented in
+`src/discord_bot/commands/schedule.py`. Commute methods above are available to application code but are not
+registered as slash commands.
 
 ## Wiring with Developer 2's database
 
@@ -84,7 +85,7 @@ for the terminal chat without MongoDB.
 
 ## Commute setup and home addresses
 
-`/commute setup` (also offered as a button after a schedule is saved) opens a private form: general area, usual
+The "Set up your commute" button shown after a schedule is saved opens a private form: general area, usual
 departure time, transport, ride-sharing opt-in and an optional home address. It's saved with
 `save_commute_setup`, which validates every field; `forget_home_address` deletes the address.
 
@@ -94,9 +95,9 @@ The address is stored in `CommutePreferences.home_address` and is private:
   `data/asu-buildings.json` (unknown buildings fall back to the Memorial Union, and the reply says so);
 - it's never shown to other students, used for matching, logged, or sent to the language model (the
   preference tools show it as "saved (private)");
-- `/commute availability` adds "leave home by" for the student only, and `/commute plan` uses the longest trip
-  among members with a saved address (everyone leaves together); without addresses it's a 30-minute estimate,
-  and every reply says which.
+- Availability adds "leave home by" for the student only, and group planning uses the longest trip among members
+  with a saved address (everyone leaves together); without addresses it's a 30-minute estimate, and every reply
+  says which.
 
 ## Tools the model can call
 

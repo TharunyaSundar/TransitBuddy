@@ -1,6 +1,6 @@
 """The commute setup form (a Discord modal): general area, usual departure time, transport, ride-sharing
-opt-in and an optional, private home address. Opened by /commute setup or the button shown after a schedule
-is saved. Everything is ephemeral; the address is never shown back to anyone.
+opt-in and an optional, private home address. Opened by the button shown after a schedule is saved.
+Everything is ephemeral; the address is never shown back to anyone.
 """
 import discord
 
@@ -36,7 +36,7 @@ class CommuteSetupModal(discord.ui.Modal, title="Commute setup"):
                 str(interaction.user.id), self.guild_id, self.area.value, self.window.value, self.modes.value,
                 self.opt_in.value, self.address.value)
         except ValueError as error:
-            text = f"Not saved: {error} Run /commute setup to try again."
+            text = f"Not saved: {error} Use the Set up your commute button to try again."
         except Exception as error:
             log(f"Saving commute setup failed: {error}")
             text = "Saving failed. Please try again in a minute."

@@ -1,5 +1,6 @@
-"""/commute availability, match and plan with fake Discord interactions and the agent's in-memory demo database
-(no Discord, Ollama or MongoDB needed). Demo students: 1001 Alex, 1002 Priya (Mesa, opted in),
+"""Commute handlers with fake Discord interactions and the agent's in-memory demo database (no Discord, Ollama
+or MongoDB needed). These handlers are tested directly and are not registered as slash commands.
+Demo students: 1001 Alex, 1002 Priya (Mesa, opted in),
 1003 Jordan (Downtown Phoenix), 1004 Sam (Mesa, not opted in). The clock is Monday 7:00 AM."""
 import asyncio
 from datetime import datetime
@@ -60,13 +61,9 @@ def reply(inter) -> dict:
     return inter.followup.sent[0]
 
 
-def test_bot_registers_commute_group():
+def test_bot_does_not_register_commute_slash_group():
     bot = create_discord_client()
-    group = bot.tree.get_command("commute")
-    assert sorted(c.name for c in group.commands) == ["availability", "forget-address", "match", "plan", "setup"]
-    assert group.guild_only
-    plan = group.get_command("plan")
-    assert [p.name for p in plan.parameters if p.required] == ["classmate1"]
+    assert bot.tree.get_command("commute") is None
 
 
 def test_availability_is_private_and_skips_bots_and_self():

@@ -207,7 +207,7 @@ class AgentService:
         r.setdefault("direction", direction)
         return commute.plan_text(r)[:MAX_RESPONSE_CHARS]
 
-    # /commute setup: area, usual departure time, transport, ride-sharing opt-in and the private home address.
+    # Commute setup form: area, usual departure time, transport, ride-sharing opt-in and private home address.
 
     async def commute_setup_defaults(self, discord_user_id: str, discord_guild_id: str) -> dict:
         """Saved preferences to pre-fill the setup form (the student's own, including their address)."""

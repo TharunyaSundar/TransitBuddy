@@ -31,10 +31,8 @@ Transit Buddy combines a Discord interface, a MongoDB-backed data layer, and a L
 - Shared Pydantic contracts for communication between teams
 - Environment configuration handling
 - Documentation for responsibilities and integration contracts
-- Python Discord client with `/ping`, `/status`, and mention responses
+- Python Discord client with `/ask`, `/schedule upload`, and `/schedule view`
 - `/schedule upload` (review a screenshot privately, then Confirm or Cancel) and `/schedule view`
-- `/commute availability`, `/commute match` (opted-in partners) and `/commute plan` (a shared departure time)
-- `/commute setup`: a private form for general area, usual departure time, transport, ride-sharing opt-in and an optional home address (only used for that student's own trip times; `/commute forget-address` deletes it)
 - Guild slash-command registration script
 
 ## Technology Stack
@@ -163,7 +161,7 @@ The integration flow is intentionally simple:
 The minimum hackathon scope includes:
 
 - initial project foundation and contract definitions
-- Discord bot shell with `/ping` and `/status` commands
+- Discord bot commands: `/ask`, `/schedule upload`, and `/schedule view`
 - MongoDB service placeholders and data contracts
 - LangChain agent skeleton and skill templates
 - schedule extraction workflow from screenshots

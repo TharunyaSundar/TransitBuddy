@@ -1,5 +1,5 @@
-"""/commute setup (the private form), /commute forget-address and the setup button after a schedule is saved.
-Fake Discord interactions, a fake trip planner and the agent's in-memory demo database."""
+"""Commute setup form and its post-schedule button, tested with fake Discord interactions, a fake trip planner
+and the agent's in-memory demo database."""
 import asyncio
 from types import SimpleNamespace
 

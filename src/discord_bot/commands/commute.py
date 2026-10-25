@@ -1,7 +1,7 @@
-"""/commute availability, /commute match and /commute plan.
+"""Commute interaction handlers (not currently registered as slash commands).
 
-Replies are private (ephemeral). /commute plan can be shared with the channel when share is set, so the group
-sees the same proposal. Only names, general areas and approximate times of other students are shown.
+Replies are private (ephemeral) by default. The group-plan handler can share a proposal with the channel.
+Only names, general areas and approximate times of other students are shown.
 """
 from typing import Callable
 

@@ -24,7 +24,7 @@ Matches nearby students who share compatible schedules and commute preferences w
 
 ## Tools needed
 - get_my_commute_preferences / save_commute_preferences (general area, modes, usual departure window, opt-in).
-- /commute setup: the private form students use to save all of these plus an optional home address.
+- The "Set up your commute" private form shown after a schedule is saved can save these plus an optional home address.
 - find_commute_partners (opted-in students, same general area, arrival or leaving times within 30 minutes).
 
 ## Keywords

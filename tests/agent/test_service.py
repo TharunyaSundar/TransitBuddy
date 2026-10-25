@@ -167,7 +167,7 @@ class Prompt(unittest.TestCase):
     def test_prompt_names_the_slash_commands(self):
         from src.agent.prompts.system_prompt import build_system_prompt
         text = build_system_prompt(MONDAY_7AM, "", None, {})
-        for command in ("/schedule upload", "/schedule view", "/commute plan", "/ask"):
+        for command in ("/schedule upload", "/schedule view", "/ask"):
             self.assertIn(command, text)
         self.assertIn("never ask for a screenshot here", text)
 

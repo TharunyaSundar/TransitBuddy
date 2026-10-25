@@ -1,4 +1,4 @@
-"""Commute answers for slash commands (/commute availability, match, plan).
+"""Commute calculations used by the agent and its internal command handlers.
 
 Slash commands already give structured input, so these run the agent's tools directly, without the language
 model: faster, no tokens, and every time shown comes from the schedule data and the negotiation logic.
@@ -81,8 +81,8 @@ def _trip_line(r: dict) -> str:
         return f"Based on a {n}-minute trip."
     if source.startswith("trip planner"):
         return f"Based on a {n}-minute trip: the longest trip from your saved homes, from the trip planner."
-    return (f"Assuming a {n}-minute trip (an estimate: save a home address with /commute setup, or set "
-            f"travel_minutes).")
+    return (f"Assuming a {n}-minute trip (an estimate: use the private commute setup form to save a home address, "
+            f"or set travel_minutes).")
 
 
 def plan_text(r: dict) -> str:
@@ -142,7 +142,7 @@ _STREETISH = re.compile(r"\d{2,}\s+\w+|\b(st|ave|rd|blvd|dr|apt|unit)\b|#", re.I
 
 
 def parse_setup(area: str, window: str, modes: str, opt_in: str, address: str) -> dict:
-    """The /commute setup form -> CommutePreferences fields. Raises ValueError with a student-facing message."""
+    """Convert the commute setup form into CommutePreferences fields."""
     from .logic.schedule import _start_end
     area = (area or "").strip()
     if not area:
@@ -182,5 +182,5 @@ def setup_summary(setup: dict, travel_on: bool) -> str:
                      + ("." if travel_on else " (trip times are off on this bot, so plans use estimates)."))
     else:
         lines.append("- Home address: not saved (plans use estimated trip times)")
-    lines.append("Change it any time with /commute setup; /commute forget-address deletes the address.")
+    lines.append("Change it with the private commute setup form; leave the address blank to delete it.")
     return "\n".join(lines)

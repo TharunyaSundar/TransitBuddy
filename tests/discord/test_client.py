@@ -14,16 +14,15 @@ def test_client_uses_non_privileged_guild_intents():
     assert not client.intents.message_content
 
 
-def test_client_registers_ping_and_status_commands():
+def test_client_registers_only_ask_and_schedule_commands():
     client = create_discord_client()
 
-    ping = client.tree.get_command("ping")
-    status = client.tree.get_command("status")
-    ask = client.tree.get_command("ask")
+    commands = {command.name: command for command in client.tree.get_commands()}
 
-    assert isinstance(ping, discord.app_commands.Command)
-    assert isinstance(status, discord.app_commands.Command)
-    assert isinstance(ask, discord.app_commands.Command)
+    assert set(commands) == {"ask", "schedule"}
+    assert isinstance(commands["ask"], discord.app_commands.Command)
+    assert isinstance(commands["schedule"], discord.app_commands.Group)
+    assert {command.name for command in commands["schedule"].commands} == {"upload", "view"}
 
 
 def test_ask_passes_discord_context_to_agent_and_replies_privately():

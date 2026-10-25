@@ -33,8 +33,8 @@ schedule, timetable, screenshot, upload, classes, class, courses, course, semest
 
 ## Rules and constraints
 - Never persist unconfirmed schedules.
-- Do not infer, ask for or store a home address here. Students can save one privately with /commute setup;
-  it's used only for their own trip times.
+- Do not infer, ask for or store a home address here. Students can save one privately in the "Set up your
+  commute" form shown after saving a schedule; it's used only for their own trip times.
 - Keep timezone handling explicit.
 - Use consistent weekday naming.
 
