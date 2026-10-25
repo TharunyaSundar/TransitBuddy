@@ -41,10 +41,16 @@ text = agent.format_schedule(result.extracted_schedule)  # short list to show wi
 await agent.save_confirmed_schedule(user_id, guild_id)            # or pass an edited schedule as 3rd arg
 agent.discard_pending_schedule(user_id)                           # Edit / Cancel button
 text = await agent.view_schedule(user_id, guild_id)              # saved + pending schedule, for /schedule view
+# /commute commands: structured input, answered without the language model
+text = await agent.commute_availability(user_id, guild_id, "today", classmate_ids)
+text = await agent.commute_match(user_id, guild_id, "today", "to_campus", "9:00 AM", classmate_ids)
+text = await agent.commute_plan(user_id, guild_id, classmate_ids, "today", "to_campus", travel_minutes=25,
+                                arrive_by=None, constraints="Priya can't leave before 8:30 AM")
 ```
 
 The agent never sends Discord messages and never saves an unconfirmed schedule. `/schedule upload` and
-`/schedule view` (`src/discord_bot/commands/schedule.py`) are a working example of these calls.
+`/schedule view` (`src/discord_bot/commands/schedule.py`) and the `/commute` commands
+(`src/discord_bot/commands/commute.py`) are working examples of these calls.
 
 ## Wiring with Developer 2's database
 
