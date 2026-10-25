@@ -137,57 +137,67 @@ nav .links a:hover { color: var(--fg); }
 @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .replay { margin: 0 18px 18px; align-self: flex-start; }
 
-/* leave planner */
+/* calculator */
 .panel { background: var(--card); border: 1.5px solid var(--line); border-radius: 20px; padding: clamp(18px, 3vw, 32px); margin-top: 40px; min-width: 0; }
-.controls { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: center; margin-bottom: 22px; }
-.seg { display: inline-flex; border: 1.5px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
-.seg button { border: 0; background: transparent; color: var(--mute); font: 600 14px var(--font-body); padding: 8px 16px; border-radius: 999px; cursor: pointer; }
+.calc { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: clamp(20px, 4vw, 44px); align-items: center; }
+@media (max-width: 860px) { .calc { grid-template-columns: minmax(0, 1fr); } }
+.field { display: grid; gap: 8px; margin-bottom: 20px; }
+.lbl { font: 500 12px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--mute); display: flex; justify-content: space-between; }
+.lbl output { color: var(--accent2); }
+input[type="time"] { font: 500 18px var(--font-mono); background: var(--bubble); color: var(--fg); border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1.5px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; color: var(--mute); font: 600 14px var(--font-body); padding: 8px 14px; border-radius: 999px; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
-.chips { display: flex; gap: 8px; flex-wrap: wrap; }
-.chip { display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid var(--line); background: transparent; color: var(--fg); border-radius: 999px; padding: 7px 14px 7px 8px; font: 500 14px var(--font-body); cursor: pointer; }
-.chip i { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 800 12px var(--font-display); font-style: normal; }
-.chip[aria-pressed="false"] { opacity: .45; }
-.chip[aria-pressed="true"] { border-color: var(--accent); }
-.chip[disabled] { opacity: .3; cursor: default; }
-.lbl { font: 500 12px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
-.gantt { position: relative; overflow-x: auto; }
-.gantt-inner { position: relative; min-width: 560px; }
-.hours { display: grid; grid-template-columns: 96px 1fr; font: 500 11px var(--font-mono); color: var(--mute); }
-.hours div:last-child { display: flex; justify-content: space-between; }
-.grow { display: grid; grid-template-columns: 96px 1fr; align-items: center; height: 46px; }
-.grow .name { font-weight: 600; font-size: 14.5px; }
-.lane { position: relative; height: 26px; background: repeating-linear-gradient(90deg, transparent 0 calc(12.5% - 1px), var(--line) calc(12.5% - 1px) 12.5%); border-radius: 6px; }
-.blk { position: absolute; top: 3px; bottom: 3px; border-radius: 6px; opacity: .92; display: grid; place-items: center; font: 500 10.5px var(--font-mono); color: #fff; overflow: hidden; white-space: nowrap; }
-.free { position: absolute; top: 0; bottom: 0; border-radius: 6px; border: 1.5px dashed var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
-.nocls { color: var(--mute); font-size: 13px; padding-left: 10px; line-height: 26px; }
-.lineWrap { position: absolute; left: 96px; right: 0; top: 18px; bottom: 0; pointer-events: none; }
-.leave { position: absolute; top: 0; bottom: 0; width: 0; border-left: 3px solid var(--accent2); transition: left .35s ease; }
-.leave b { position: absolute; top: -26px; transform: translateX(-50%); background: var(--accent2); color: #1a0d00; font: 600 12px var(--font-mono); padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.bar { display: flex; height: 54px; border-radius: 12px; overflow: hidden; background: var(--bubble); }
+.bar div { display: grid; place-items: center; font: 500 12px var(--font-mono); color: #fff; min-width: 0; transition: flex-grow .3s ease; overflow: hidden; white-space: nowrap; }
+.bar .s-wait { background: transparent; color: var(--mute); }
+.bar .s-trip { background: var(--blurple); }
+.bar .s-buf { background: #2f9e62; }
+.bar .s-cls { background: var(--accent2); color: #1a0d00; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; font-size: 14px; color: var(--mute); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .verdict { margin-top: 22px; display: grid; gap: 4px; }
-.verdict strong { font: 800 clamp(26px, 4vw, 40px)/1.05 var(--font-display); font-stretch: 85%; text-transform: uppercase; }
+.verdict strong { font: 800 clamp(30px, 5vw, 56px)/1.02 var(--font-display); font-stretch: 80%; text-transform: uppercase; }
 .verdict span { color: var(--mute); }
+.formula { font: 400 13.5px/1.6 var(--font-mono); color: var(--mute); margin-top: 14px; }
 
-/* privacy */
-.priv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; margin-top: 40px; }
-@media (max-width: 860px) { .priv { grid-template-columns: minmax(0, 1fr); } }
-.switch { display: flex; align-items: center; gap: 14px; font-weight: 600; cursor: pointer; }
-.switch input { position: absolute; opacity: 0; }
-.switch .tr { width: 52px; height: 30px; border-radius: 999px; background: var(--line); position: relative; flex: none; transition: background .2s; }
-.switch .tr::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .2s; }
-.switch input:checked + .tr { background: var(--ok); }
-.switch input:checked + .tr::after { transform: translateX(22px); }
-.switch input:focus-visible + .tr { outline: 3px solid var(--accent2); outline-offset: 3px; }
-.profile { background: var(--bubble); border-radius: 14px; padding: 18px; margin-top: 18px; display: grid; gap: 0; }
-.profile .row { display: flex; justify-content: space-between; gap: 14px; padding: 11px 0; border-top: 1px dashed var(--line); font-size: 15.5px; }
-.profile .row:first-child { border-top: 0; }
-.profile .row span:first-child { color: var(--mute); }
+/* data flow */
+.flow { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 22px; margin-top: 40px; align-items: start; }
+@media (max-width: 860px) { .flow { grid-template-columns: minmax(0, 1fr); } }
+.flow .cmds { gap: 8px; }
+.card { background: var(--card); border: 1.5px solid var(--line); border-radius: 18px; padding: clamp(18px, 3vw, 28px); min-width: 0; }
+.card h3 { font-size: 26px; font-weight: 800; font-stretch: 88%; text-transform: uppercase; margin-bottom: 14px; }
+.kv { display: grid; gap: 0; }
+.kv > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 14px; padding: 12px 0; border-top: 1px dashed var(--line); font-size: 16px; }
+.kv > div:first-child { border-top: 0; }
+.kv dt { color: var(--mute); font: 500 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; padding-top: 3px; }
+.kv dd { margin: 0; }
+@media (max-width: 520px) { .kv > div { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
 .pill { font: 600 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; }
 .pill.hide { background: color-mix(in srgb, var(--accent2) 22%, transparent); color: var(--accent2); }
 .pill.show { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
-.facts { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.facts { display: grid; gap: 14px; margin: 28px 0 0; padding: 0; list-style: none; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 760px) { .facts { grid-template-columns: minmax(0, 1fr); } }
 .facts li { padding: 16px 18px; border: 1.5px solid var(--line); border-radius: 14px; }
 .facts b { display: block; font: 700 18px var(--font-display); font-stretch: 92%; margin-bottom: 4px; }
 .facts span { color: var(--mute); font-size: 15.5px; }
+.soon { display: inline-block; font: 600 11px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; background: color-mix(in srgb, var(--accent2) 22%, transparent); color: var(--accent2); margin-bottom: 14px; }
+
+/* embeds (match the bot's colours) */
+.embed { margin-top: 6px; background: var(--bubble); border-left: 5px solid var(--ok); border-radius: 6px 14px 14px 6px; padding: 12px 16px 14px; }
+.embed.clarification { border-left-color: #e5b92a; } .embed.unsupported { border-left-color: var(--accent2); } .embed.error { border-left-color: #e5534b; }
+.embed h4 { margin: 0 0 6px; font: 700 16px var(--font-body); }
+.embed .d { font-size: 15px; color: var(--fg); }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 16px; margin-top: 12px; }
+.fields b { display: block; font-size: 12.5px; color: var(--mute); font-weight: 600; }
+.fields span { font-size: 15px; }
+.embed small { display: block; margin-top: 12px; color: var(--mute); font-size: 12px; }
+.outs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.outs button { font: 600 13px var(--font-body); border: 1.5px solid var(--line); background: transparent; color: var(--fg); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.outs button[aria-pressed="true"] { border-color: var(--accent); background: var(--card); }
+.usage { margin-top: 14px; color: var(--mute); font-size: 14.5px; }
+.usage code { font: 500 13px var(--font-mono); color: var(--accent); }
 
 /* how */
 .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 44px; position: relative; }
@@ -218,17 +228,17 @@ footer a { color: var(--fg); }
   <nav>
     <a class="brand" href="#top"><i aria-hidden="true"></i>Transit Buddy</a>
     <div class="links">
-      <a href="#demo">Try it</a>
-      <a href="#leave">Leave times</a>
+      <a href="#demo">Commands</a>
+      <a href="#leave">Leave time</a>
       <a href="#privacy">Privacy</a>
       <a class="btn btn-primary" data-invite href="#" target="_blank" rel="noopener">Add to Discord</a>
     </div>
   </nav>
 
   <header class="hero" id="top">
-    <div class="eyebrow">Discord bot for ASU Tempe</div>
-    <h1>Same class. Same bus. <em>Same ride.</em></h1>
-    <p class="lede">Transit Buddy reads your class schedule from a screenshot, then helps you and your classmates agree on when to leave for campus and when to head home. It is a bot in your own Discord server.</p>
+    <div class="eyebrow">Discord bot for ASU Tempe students</div>
+    <h1>Know when to <em>leave</em> for class.</h1>
+    <p class="lede">Upload a screenshot of your class schedule. Then ask in plain words, like "get me to campus before my first class tomorrow", and Transit Buddy works out when to leave to reach your building on time.</p>
     <div class="cta-row">
       <a class="btn btn-primary" data-invite href="#" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -236,65 +246,66 @@ footer a { color: var(--fg); }
       </a>
       <a class="btn btn-ghost" href="#demo">Try the commands</a>
     </div>
-    <svg class="route" viewBox="0 0 1100 150" role="img" aria-label="A route from Tempe Village through Apache Boulevard and Mill Avenue to ASU Tempe campus">
+    <svg class="route" viewBox="0 0 1100 150" role="img" aria-label="A route from home through two stops to ASU Tempe campus">
       <path class="track" d="M30 100 C 200 100, 220 40, 380 40 S 600 110, 760 110 S 930 50, 1070 50"/>
       <path class="live" d="M30 100 C 200 100, 220 40, 380 40 S 600 110, 760 110 S 930 50, 1070 50"/>
-      <circle class="stop" cx="30" cy="100" r="13"/><text x="14" y="138">Tempe Village</text>
-      <circle class="stop" cx="380" cy="40" r="13"/><text x="330" y="20">Apache Blvd</text>
-      <circle class="stop" cx="760" cy="110" r="13"/><text x="716" y="142">Mill Ave</text>
-      <circle class="stop end" cx="1070" cy="50" r="13"/><text x="968" y="92">ASU Tempe</text>
+      <circle class="stop" cx="30" cy="100" r="13"/><text x="14" y="138">Home</text>
+      <circle class="stop" cx="380" cy="40" r="13"/><text x="330" y="20">Leave by 8:20</text>
+      <circle class="stop" cx="760" cy="110" r="13"/><text x="700" y="142">Arrive 8:50</text>
+      <circle class="stop end" cx="1070" cy="50" r="13"/><text x="968" y="92">Class 9:00</text>
     </svg>
   </header>
 
   <section id="demo">
-    <div class="eyebrow">Live demo</div>
-    <h2>Pick a command</h2>
-    <p class="lede">These are the real slash commands. The conversation below is a simulation with made-up students, and the buttons work.</p>
+    <div class="eyebrow">Commands</div>
+    <h2>Four slash commands</h2>
+    <p class="lede">These work in a server where the bot is added, not in direct messages. Every reply is private: only you see it. The conversations below are simulated with made-up data, and the buttons work.</p>
     <div class="demo">
       <div class="cmds" role="tablist" aria-label="Commands" id="cmds"></div>
       <div class="chat">
-        <div class="chat-head"><span class="hash">#</span> commute-crew</div>
+        <div class="chat-head"><span class="hash">#</span> general</div>
         <div class="chat-body" id="chat" aria-live="polite"></div>
         <button class="btn btn-ghost replay" id="replay" type="button" style="padding:10px 18px;font-size:13px">Replay</button>
       </div>
     </div>
+    <p class="usage" style="margin-top:18px">You can also mention the bot (@Transit Buddy) and it replies that it is online.</p>
   </section>
 
   <section id="leave">
-    <div class="eyebrow">Leave times</div>
-    <h2>Class ends is not leave time</h2>
-    <p class="lede">A class that ends at 10:15 does not mean everyone is walking out at 10:15. Pick a day and who is coming along. The bar shows when the whole group is actually free.</p>
+    <div class="eyebrow">Leave time</div>
+    <h2>How your departure time is worked out</h2>
+    <p class="lede">Transit Buddy picks the class you mean, aims to arrive a few minutes early, then subtracts the estimated trip. Change the numbers to see it move.</p>
     <div class="panel">
-      <div class="controls">
-        <div><div class="lbl" style="margin-bottom:8px">Day</div>
-          <div class="seg" id="days" role="group" aria-label="Day"></div></div>
-        <div><div class="lbl" style="margin-bottom:8px">Who is going</div>
-          <div class="chips" id="people"></div></div>
-        <div><div class="lbl" style="margin-bottom:8px">Pack-up buffer</div>
-          <div class="seg" id="buffer" role="group" aria-label="Buffer"></div></div>
+      <div class="calc">
+        <div>
+          <div class="field"><label class="lbl" for="cls">Class starts</label><input type="time" id="cls" value="09:00"></div>
+          <div class="field"><span class="lbl">Arrive early by</span><div class="seg" id="buf" role="group" aria-label="Arrive early by"></div></div>
+          <div class="field"><label class="lbl" for="trip">Estimated trip <output id="tripOut">30 min</output></label><input type="range" id="trip" min="5" max="90" step="5" value="30"></div>
+          <div class="field"><span class="lbl">Travelling by</span><div class="seg" id="mode" role="group" aria-label="Travelling by"></div></div>
+        </div>
+        <div>
+          <div class="bar" id="bar" aria-hidden="true"></div>
+          <div class="legend"><span><i style="background:var(--blurple)"></i>Trip</span><span><i style="background:#2f9e62"></i>Arrive early</span><span><i style="background:var(--accent2)"></i>Class</span></div>
+          <div class="verdict" id="verdict"></div>
+          <p class="formula">leave = class start - early arrival - trip estimate</p>
+        </div>
       </div>
-      <div class="gantt"><div class="gantt-inner" id="gantt"></div></div>
-      <div class="verdict" id="verdict"></div>
     </div>
+    <ul class="facts">
+      <li><b>The trip time is an estimate</b><span>It comes from the team's trip planner, which uses Google Maps. Traffic and transit can change it.</span></li>
+      <li><b>Home to campus only, for now</b><span>Planning a trip home, or a request with only a leave time, is not supported yet. The bot tells you so.</span></li>
+      <li><b>Your building, not a guess</b><span>It knows 56 ASU Tempe buildings. If yours isn't one of them, it uses the Memorial Union and says so.</span></li>
+      <li><b>Your mode of travel</b><span>It uses your preferred way of getting to campus when you've saved one: driving, bus or train, walking or biking. Otherwise it assumes a car.</span></li>
+    </ul>
   </section>
 
   <section id="privacy">
     <div class="eyebrow">Privacy</div>
-    <h2>Your address stays yours</h2>
-    <p class="lede">Matching is opt-in. Flip the switch to see exactly what a classmate gets when they run <span class="mono">/commute match</span>.</p>
-    <div class="priv">
-      <div class="panel" style="margin-top:0">
-        <label class="switch"><input type="checkbox" id="optin" checked><span class="tr"></span>Match me with other students</label>
-        <div class="profile" id="profile"></div>
-        <div class="btns"><button class="dbtn no" id="forget" type="button">/commute forget-address</button></div>
-        <p class="only" id="forgetNote" style="margin-top:12px"></p>
-      </div>
-      <ul class="facts">
-        <li><b>Private setup form</b><span>/commute setup opens a form only you can see. Replies to your commands are private too.</span></li>
-        <li><b>Area, not address</b><span>Classmates see a general area and an approximate time window. Your home address is only used for your own trip times.</span></li>
-        <li><b>Nothing saved without a yes</b><span>A schedule screenshot is shown to you first. It is saved only when you press Confirm.</span></li>
-        <li><b>Delete any time</b><span>/commute forget-address removes your commute profile, including the address.</span></li>
-      </ul>
+    <h2>Where your data goes</h2>
+    <p class="lede">Pick something you give the bot to see what happens to it.</p>
+    <div class="flow">
+      <div class="cmds" role="tablist" aria-label="Your data" id="dataTabs"></div>
+      <div class="card" id="dataCard"></div>
     </div>
   </section>
 
@@ -302,10 +313,20 @@ footer a { color: var(--fg); }
     <div class="eyebrow">How it works</div>
     <h2>Three stops</h2>
     <div class="steps">
-      <div class="step"><h3>Add the bot</h3><p>Invite Transit Buddy to your server. Run /commute setup once to save your area, usual departure time and whether you want matches.</p></div>
-      <div class="step"><h3>Upload a screenshot</h3><p>/schedule upload reads your classes from an image. You check them and press Confirm. Nothing is saved before that.</p></div>
-      <div class="step"><h3>Agree on a time</h3><p>/commute availability, /commute match and /commute plan turn everyone's classes into one departure time to propose.</p></div>
+      <div class="step"><h3>Add the bot</h3><p>Invite Transit Buddy to your Discord server. Save your home address in your private commute profile so it can estimate trips.</p></div>
+      <div class="step"><h3>Upload your schedule</h3><p><span class="mono">/schedule upload</span> reads your classes from a screenshot. You check them and press Confirm. Nothing is saved before that.</p></div>
+      <div class="step"><h3>Ask when to leave</h3><p><span class="mono">/commute plan</span> turns a plain request into a departure time. <span class="mono">/ask</span> answers other questions about your schedule.</p></div>
     </div>
+  </section>
+
+  <section id="next">
+    <div class="eyebrow">In development</div>
+    <h2>Next stop: classmates</h2>
+    <p class="lede">Matching and shared departure times are built but not switched on yet, so no command offers them today.</p>
+    <ul class="facts">
+      <li><span class="soon">Not live yet</span><b>Meet on your way</b><span>Only students who opt in are compared. Matches need the same area, day, direction and campus, and departure estimates within about 15 minutes. The plan is to keep names hidden until both sides accept.</span></li>
+      <li><span class="soon">Not live yet</span><b>Temporary and consent-based</b><span>Match data is kept in memory for two hours and cleared on restart. Schedules alone never create a match.</span></li>
+    </ul>
   </section>
 
   <section class="cta" id="add">
@@ -319,7 +340,7 @@ footer a { color: var(--fg); }
   </section>
 
   <footer>
-    <span>Transit Buddy is a hackathon project for ASU Tempe students. Students and schedules in this demo are made up.</span>
+    <span>Transit Buddy is a hackathon project for ASU Tempe students. Students, schedules and times shown here are made up.</span>
     <a href="https://github.com/TharunyaSundar/TransitBuddy" target="_blank" rel="noopener">GitHub</a>
   </footer>
 </div>
@@ -337,25 +358,24 @@ footer a { color: var(--fg); }
   });
 
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var COLORS = { Maya: "#7a5cff", Jordan: "#e0577a", Sam: "#1f9d8b", Priya: "#d98a1e", You: "#4f6bff" };
+  var COLORS = { You: "#4f6bff" };
   function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 
   /* ---------- chat demo ---------- */
   var chat = document.getElementById("chat"), cmdBox = document.getElementById("cmds");
   var CMDS = [
-    { id: "upload", cmd: "/schedule upload", d: "Screenshot in, classes out. You confirm before anything is saved." },
-    { id: "avail", cmd: "/commute availability", d: "When you and classmates need to be on campus and are free." },
-    { id: "match", cmd: "/commute match", d: "Opted-in students from your area with similar times." },
-    { id: "plan", cmd: "/commute plan", d: "One departure time proposed for the whole group." },
-    { id: "ask", cmd: "/ask", d: "Ask in plain words about schedules and commutes." }
+    { id: "upload", cmd: "/schedule upload", d: "Read your classes from a screenshot. Saved only after you confirm." },
+    { id: "view", cmd: "/schedule view", d: "Show the schedule you saved." },
+    { id: "plan", cmd: "/commute plan", d: "Describe your trip in words, get a departure time." },
+    { id: "ask", cmd: "/ask", d: "Ask about your schedule, availability or commute." }
   ];
-  var timers = [], current = "upload";
+  var timers = [], current = "upload", planOutcome = "success";
   function clearTimers() { timers.forEach(clearTimeout); timers = []; }
   function later(fn, ms) { timers.push(setTimeout(fn, reduce ? 0 : ms)); }
-  function userMsg(who, slashHtml) {
+  function userMsg(slashHtml) {
     var m = el("div", "msg");
-    m.appendChild(el("div", "av", who[0])).style.background = COLORS[who] || COLORS.You;
-    var r = el("div"); r.appendChild(el("div", "who", who));
+    m.appendChild(el("div", "av", "Y")).style.background = COLORS.You;
+    var r = el("div"); r.appendChild(el("div", "who", "You"));
     r.appendChild(el("div", "slash", slashHtml)); m.appendChild(r); chat.appendChild(m); return m;
   }
   function botMsg(html, extra) {
@@ -363,7 +383,7 @@ footer a { color: var(--fg); }
     var av = el("div", "av", "TB"); av.style.background = "var(--accent)"; av.style.color = "var(--on-accent)"; av.style.fontSize = "13px";
     m.appendChild(av);
     var r = el("div"); r.appendChild(el("div", "who", 'Transit Buddy <span class="tag">APP</span>'));
-    var b = el("div", "bubble", html); r.appendChild(b);
+    var b = el("div", html.indexOf("<div class='embed") === 0 ? "" : "bubble", html); r.appendChild(b);
     r.appendChild(el("div", "only", "Only you can see this"));
     if (extra) extra(r, b);
     m.appendChild(r); chat.appendChild(m); return m;
@@ -372,48 +392,71 @@ footer a { color: var(--fg); }
     var t = botMsg('<span class="typing"><i></i><i></i><i></i></span>');
     later(function () { t.remove(); fn(); }, ms || 900);
   }
+  var FOOT = "Transit conditions may change. Travel duration and departure times are estimates.";
+  var OUTCOMES = {
+    success: { label: "Plan found", cls: "success", title: "Your Commute Plan", build: function () {
+      return "<div class='d'>Transit conditions may affect your trip. Duration and departure time are estimates.</div><div class='fields'>"
+        + f("Course", "CSE 565 - Software Verification") + f("Class starts", "9:00 AM") + f("Campus building", "BYENG")
+        + f("Travel date", "2026-10-27") + f("Target arrival", "8:50 AM") + f("Estimated commute", "~30 minutes (estimate)")
+        + f("Recommended departure", "~8:20 AM (estimate)") + f("Transport", "car") + "</div><small>" + FOOT + "</small>"; } },
+    clarification: { label: "Needs a detail", cls: "clarification", title: "Commute Details Needed", build: function () {
+      return "<div class='d'>Should I plan a trip to campus or home?</div><small>" + FOOT + "</small>"; } },
+    unsupported: { label: "Trip home", cls: "unsupported", title: "Commute Plan Not Supported", build: function () {
+      return "<div class='d'>The current trip planner only estimates trips from your saved home to campus; it can't estimate the return trip yet.</div><small>" + FOOT + "</small>"; } },
+    error: { label: "No address saved", cls: "error", title: "Commute Plan Unavailable", build: function () {
+      return "<div class='d'>I don't have a saved home address for your private commute profile yet. Add it privately before planning a trip to or from campus.</div><small>" + FOOT + "</small>"; } }
+  };
+  function f(k, v) { return "<div><b>" + k + "</b><span>" + v + "</span></div>"; }
+  var REQUESTS = { success: "get me to campus before my first class tomorrow", clarification: "I need to get somewhere on Monday",
+    unsupported: "when should I leave to get home after my last class on Monday", error: "get me to campus before my first class tomorrow" };
   var SCRIPTS = {
     upload: function () {
-      userMsg("You", '<b>/schedule upload</b> image: <span class="mono">fall-2026.png</span>');
+      userMsg("<b>/schedule upload</b> image: <span class='mono'>fall-2026.png</span> semester: <span class='mono'>(optional)</span>");
       typingThen(function () {
-        botMsg("Here's what I read from your screenshot:<ul><li><b>CSE 565</b> Software Verification<br><span class='time'>Mon Wed 09:00-10:15</span> BYENG 210</li><li><b>CSE 572</b> Data Mining<br><span class='time'>Mon Wed 13:30-14:45</span> GWC 487</li></ul><p style='margin-top:10px;color:var(--mute)'>Semester: Fall 2026. Press Confirm to save it, or Cancel to discard it.</p>", function (r, b) {
+        botMsg("Here's what I read from your screenshot:<ul><li><b>CSE 565</b> Software Verification<br><span class='time'>Mon Wed 09:00-10:15</span> BYENG 210</li><li><b>CSE 572</b> Data Mining<br><span class='time'>Mon Wed 13:30-14:45</span> GWC 487</li></ul><p style='margin-top:10px;color:var(--mute)'>Press Confirm to save it, or Cancel to discard it.</p>", function (r, b) {
           var row = el("div", "btns"), ok = el("button", "dbtn ok", "Confirm"), no = el("button", "dbtn no", "Cancel");
           ok.type = no.type = "button";
           function finish(msg) { ok.disabled = no.disabled = true; typingThen(function () { botMsg(msg); }, 500); }
-          ok.onclick = function () { finish("Saved your schedule. Use <span class='mono'>/schedule view</span> to see it."); };
-          no.onclick = function () { finish("Not saved. Upload it again any time with <span class='mono'>/schedule upload</span>."); };
+          ok.onclick = function () { finish("Saved your schedule. Use /schedule view to see it."); };
+          no.onclick = function () { finish("Not saved. Upload it again any time with /schedule upload."); };
           row.appendChild(ok); row.appendChild(no); b.appendChild(row);
         });
       }, 1300);
     },
-    avail: function () {
-      userMsg("You", "<b>/commute availability</b> day: <span class='mono'>Monday</span> with: <span class='mono'>@Jordan</span>");
+    view: function () {
+      userMsg("<b>/schedule view</b>");
       typingThen(function () {
-        botMsg("<div class='row'><span>You</span><span class='time'>on campus 08:45, free from 15:00</span></div><div class='row'><span>Jordan</span><span class='time'>on campus 08:45, free from 10:25</span></div><p style='margin-top:10px;color:var(--mute)'>Jordan's last class ends well before yours. A class ending is not the same as leaving, so I left 10 minutes to pack up.</p>");
-      });
-    },
-    match: function () {
-      userMsg("You", "<b>/commute match</b>");
-      typingThen(function () {
-        botMsg("Opted-in students from your area with similar times:<div style='margin-top:8px'><div class='row'><span><b>Jordan</b> · Tempe Village</span><span class='time'>leaves 08:00-08:30</span></div><div class='row'><span><b>Priya</b> · Mesa</span><span class='time'>leaves 08:30-09:00</span></div></div><p style='margin-top:10px;color:var(--mute)'>Only students who chose to be matched appear here, and only by area.</p>");
-      });
+        botMsg("<b>Fall 2026</b><div class='row'><span>CSE 565 Software Verification<br><small style='color:var(--mute)'>BYENG 210</small></span><span class='time'>Mon Wed 09:00-10:15</span></div><div class='row'><span>CSE 572 Data Mining<br><small style='color:var(--mute)'>GWC 487</small></span><span class='time'>Mon Wed 13:30-14:45</span></div>");
+      }, 700);
     },
     plan: function () {
-      userMsg("You", "<b>/commute plan</b> with: <span class='mono'>@Jordan @Priya</span>");
+      var o = OUTCOMES[planOutcome];
+      userMsg("<b>/commute plan</b> request: <span class='mono'>" + REQUESTS[planOutcome] + "</span>");
       typingThen(function () {
-        botMsg("Proposed plan for Monday:<div style='margin-top:8px'><div class='row'><span>Leave for campus</span><span class='time'>08:20</span></div><div class='row'><span>Leave campus</span><span class='time'>15:00</span></div></div><p style='margin-top:10px;color:var(--mute)'>Everyone is free by 14:55 on Monday. Reply to this thread if the time does not work for you.</p>");
-      }, 1100);
+        botMsg("<div class='embed " + o.cls + "'><h4>" + o.title + "</h4>" + o.build() + "</div>");
+      }, 1400);
     },
     ask: function () {
-      userMsg("You", "<b>/ask</b> question: <span class='mono'>who else has a 9 AM on Mondays?</span>");
+      userMsg("<b>/ask</b> question: <span class='mono'>when is my next class?</span>");
       typingThen(function () {
-        botMsg("Two people in this server have a 9:00 AM class on Mondays: <b>Maya</b> (CSE 565) and <b>Jordan</b> (CSE 551). Want me to check if you can leave together?");
+        botMsg("Your next class is <b>CSE 572 Data Mining</b> on Monday at <span class='time'>1:30 PM</span> in GWC 487.<p style='margin-top:10px;color:var(--mute)'>Example answer. /ask also takes questions about availability and commute options, and you can type a schedule instead of uploading a screenshot. You'll get the same Confirm and Cancel buttons before it is saved.</p>");
       }, 1200);
     }
   };
   function run(id) {
     current = id; clearTimers(); chat.innerHTML = "";
     Array.prototype.forEach.call(cmdBox.children, function (c) { c.setAttribute("aria-selected", c.dataset.id === id ? "true" : "false"); });
+    var old = document.getElementById("outs"); if (old) old.remove();
+    if (id === "plan") {
+      var outs = el("div", "outs"); outs.id = "outs"; outs.setAttribute("role", "group"); outs.setAttribute("aria-label", "Example result");
+      Object.keys(OUTCOMES).forEach(function (k) {
+        var b = el("button", null, OUTCOMES[k].label); b.type = "button"; b.setAttribute("aria-pressed", String(k === planOutcome));
+        b.addEventListener("click", function () { planOutcome = k; run("plan"); });
+        outs.appendChild(b);
+      });
+      chat.parentNode.insertBefore(outs, chat);
+      outs.style.margin = "14px 18px 0";
+    }
     SCRIPTS[id]();
   }
   CMDS.forEach(function (c) {
@@ -425,86 +468,63 @@ footer a { color: var(--fg); }
   document.getElementById("replay").addEventListener("click", function () { run(current); });
   run("upload");
 
-  /* ---------- leave-time planner ---------- */
-  var DAYS = ["Mon", "Tue"], START = 8 * 60, END = 16 * 60;
-  var P = {
-    Maya:   { Mon: [[540, 615, "CSE 565"], [810, 885, "CSE 572"]], Tue: [] },
-    Jordan: { Mon: [[540, 615, "CSE 551"]], Tue: [[630, 705, "EEE 598"]] },
-    Sam:    { Mon: [], Tue: [[540, 615, "CSE 578"]] },
-    Priya:  { Mon: [[630, 705, "CSE 475"]], Tue: [] }
-  };
-  var state = { day: "Mon", buf: 10, who: { Maya: true, Jordan: true, Sam: true, Priya: true } };
-  function fmt(m) { var h = Math.floor(m / 60), mm = m % 60; return (h < 10 ? "0" : "") + h + ":" + (mm < 10 ? "0" : "") + mm; }
-  function pct(m) { return ((m - START) / (END - START)) * 100; }
-  function seg(host, items, key, label) {
+  /* ---------- departure calculator ---------- */
+  var cs = { buf: 10, mode: "car" };
+  var cls = document.getElementById("cls"), trip = document.getElementById("trip");
+  function toMin(v) { var p = (v || "09:00").split(":"); return (+p[0]) * 60 + (+p[1]); }
+  function fmt12(m) { m = ((m % 1440) + 1440) % 1440; var h = Math.floor(m / 60), mm = m % 60, ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return h + ":" + (mm < 10 ? "0" : "") + mm + " " + ap; }
+  function segs(host, items, key) {
     host.innerHTML = "";
     items.forEach(function (it) {
-      var b = el("button", null, it.label); b.type = "button";
-      b.setAttribute("aria-pressed", String(state[key] === it.value));
-      b.addEventListener("click", function () { state[key] = it.value; render(); });
-      host.appendChild(b);
+      var b = el("button", null, it.label); b.type = "button"; b.setAttribute("aria-pressed", String(cs[key] === it.value));
+      b.addEventListener("click", function () { cs[key] = it.value; calc(); }); host.appendChild(b);
     });
   }
-  function render() {
-    seg(document.getElementById("days"), DAYS.map(function (d) { return { label: d, value: d }; }), "day");
-    seg(document.getElementById("buffer"), [0, 10, 20].map(function (n) { return { label: n + " min", value: n }; }), "buf");
-    var people = document.getElementById("people"); people.innerHTML = "";
-    Object.keys(P).forEach(function (n) {
-      var has = P[n][state.day].length > 0;
-      var c = el("button", "chip", "<i style='background:" + COLORS[n] + "'>" + n[0] + "</i>" + n); c.type = "button";
-      if (!has) { c.disabled = true; c.setAttribute("aria-pressed", "false"); c.title = "No class this day"; }
-      else { c.setAttribute("aria-pressed", String(state.who[n])); c.addEventListener("click", function () { state.who[n] = !state.who[n]; render(); }); }
-      people.appendChild(c);
+  function calc() {
+    segs(document.getElementById("buf"), [0, 10, 15, 20].map(function (n) { return { label: n + " min", value: n }; }), "buf");
+    segs(document.getElementById("mode"), [["car", "Car"], ["bus or train", "Bus or train"], ["walking", "Walking"], ["bike", "Bike"]].map(function (a) { return { label: a[1], value: a[0] }; }), "mode");
+    var start = toMin(cls.value), tr = +trip.value, arrive = start - cs.buf, leave = arrive - tr;
+    document.getElementById("tripOut").textContent = tr + " min";
+    var total = tr + cs.buf + 20;
+    var bar = document.getElementById("bar"); bar.innerHTML = "";
+    [["s-trip", tr, tr >= 15 ? tr + " min" : ""], ["s-buf", cs.buf, cs.buf >= 8 ? cs.buf + " min" : ""], ["s-cls", 20, "Class"]].forEach(function (s) {
+      if (s[1] <= 0) return; var d = el("div", s[0], s[2]); d.style.flex = s[1] + " 1 0"; bar.appendChild(d);
     });
-    var g = document.getElementById("gantt"); g.innerHTML = "";
-    var hrs = el("div", "hours"); hrs.appendChild(el("div")); var hh = el("div");
-    for (var h = 8; h <= 16; h += 2) hh.appendChild(el("span", null, (h > 12 ? h - 12 : h) + (h >= 12 ? "p" : "a")));
-    hrs.appendChild(hh); g.appendChild(hrs);
-    var leaves = [];
-    Object.keys(P).forEach(function (n) {
-      var cls = P[n][state.day], row = el("div", "grow"), lane = el("div", "lane");
-      row.appendChild(el("div", "name", n)); row.appendChild(lane);
-      var on = state.who[n] && cls.length;
-      if (!cls.length) lane.appendChild(el("div", "nocls", "no class"));
-      cls.forEach(function (c) {
-        var b = el("div", "blk", c[2]);
-        b.style.left = pct(c[0]) + "%"; b.style.width = (pct(c[1]) - pct(c[0])) + "%"; b.style.background = COLORS[n];
-        if (!on) b.style.opacity = ".3"; lane.appendChild(b);
-      });
-      if (on) {
-        var last = Math.max.apply(null, cls.map(function (c) { return c[1]; })), t = Math.ceil((last + state.buf) / 5) * 5;
-        leaves.push({ n: n, t: t });
-        var f = el("div", "free"); f.style.left = pct(t) + "%"; f.style.right = "0"; lane.appendChild(f);
-      }
-      g.appendChild(row);
-    });
-    var v = document.getElementById("verdict");
-    if (!leaves.length) { v.innerHTML = "<strong>Pick at least one person</strong><span>Choose who is coming along to see a leave time.</span>"; return; }
-    var t = Math.max.apply(null, leaves.map(function (l) { return l.t; }));
-    var wrap = el("div", "lineWrap"), ln = el("div", "leave"); ln.style.left = pct(t) + "%";
-    ln.appendChild(el("b", null, fmt(t))); wrap.appendChild(ln);
-    g.appendChild(wrap);
-    var late = leaves.filter(function (l) { return l.t === t; })[0].n;
-    v.innerHTML = "<strong>Leave at " + fmt(t) + "</strong><span>" + (leaves.length > 1
-      ? "Everyone selected is free by then. " + late + " finishes last." : leaves[0].n + " is free from " + fmt(t) + ".")
-      + " Includes " + state.buf + " minutes to pack up.</span>";
+    document.getElementById("verdict").innerHTML = "<strong>Leave at " + fmt12(leave) + "</strong><span>By " + cs.mode + ", arriving at " + fmt12(arrive) + ", " + cs.buf + " minute" + (cs.buf === 1 ? "" : "s") + " before your " + fmt12(start) + " class. The bot's default is 10 minutes early.</span>";
   }
-  render();
+  cls.addEventListener("input", calc); trip.addEventListener("input", calc);
+  calc();
 
-  /* ---------- privacy ---------- */
-  var opt = document.getElementById("optin"), prof = document.getElementById("profile"), note = document.getElementById("forgetNote"), forgotten = false;
-  function renderProfile() {
-    var on = opt.checked && !forgotten;
-    prof.innerHTML =
-      "<div class='row'><span>Home address</span><span class='pill hide'>" + (forgotten ? "deleted" : "hidden from everyone") + "</span></div>" +
-      "<div class='row'><span>Area</span><span>" + (on ? "Tempe Village <span class='pill show'>shown</span>" : (forgotten ? "deleted" : "<span class='pill hide'>not shown</span>")) + "</span></div>" +
-      "<div class='row'><span>Departure window</span><span>" + (on ? "<span class='time'>08:00-08:30</span> <span class='pill show'>shown</span>" : (forgotten ? "deleted" : "<span class='pill hide'>not shown</span>")) + "</span></div>" +
-      "<div class='row'><span>Appears in /commute match</span><span>" + (on ? "<span class='pill show'>yes</span>" : "<span class='pill hide'>no</span>") + "</span></div>";
-    note.textContent = forgotten ? "Your commute profile and address were deleted. Run /commute setup to add them again." : "";
+  /* ---------- where your data goes ---------- */
+  var DATA = [
+    { id: "shot", t: "Schedule screenshot", d: "What you upload with /schedule upload", rows: [
+      ["Seen by", "A language model, to read the classes from the image. Under 8 MB, images only."],
+      ["Then", "You get a private review with Confirm and Cancel. If you do nothing it is discarded after 10 minutes."],
+      ["Saved", "Only the classes you confirm, and only after you press Confirm.", "show"]] },
+    { id: "sched", t: "Saved schedule", d: "Your classes, per Discord server", rows: [
+      ["Stored in", "The bot's database, tied to you and the server where you saved it."],
+      ["Visible to", "You, through /schedule view. Replies are private."],
+      ["Delete", "Upload and confirm a new one to replace it."]] },
+    { id: "addr", t: "Home address", d: "Part of your private commute profile", rows: [
+      ["Used for", "Asking the trip planner how long it takes to reach your building."],
+      ["Never", "Shown to anyone, written to logs, or given to the language model."],
+      ["If you type it", "In a /commute plan request, it is replaced with [private address] before the model sees it."]] },
+    { id: "ask", t: "Your questions", d: "What you type in /ask and /commute plan", rows: [
+      ["Seen by", "A language model, which works out the day, direction and time you mean."],
+      ["Answer", "Sent back privately, only to you."],
+      ["Others", "Other students never see your schedule, address or questions."]] }
+  ];
+  var tabs = document.getElementById("dataTabs"), card = document.getElementById("dataCard");
+  function showData(id) {
+    var d = DATA.filter(function (x) { return x.id === id; })[0];
+    Array.prototype.forEach.call(tabs.children, function (c) { c.setAttribute("aria-selected", c.dataset.id === id ? "true" : "false"); });
+    card.innerHTML = "<h3>" + d.t + "</h3><dl class='kv'>" + d.rows.map(function (r) { return "<div><dt>" + r[0] + "</dt><dd>" + r[1] + "</dd></div>"; }).join("") + "</dl>";
   }
-  opt.addEventListener("change", function () { if (opt.checked) forgotten = false; renderProfile(); });
-  document.getElementById("forget").addEventListener("click", function () { forgotten = true; opt.checked = false; renderProfile(); });
-  renderProfile();
+  DATA.forEach(function (d) {
+    var b = el("button", "cmd", "<b style='font-family:var(--font-body);font-size:16px;color:var(--fg)'>" + d.t + "</b><span>" + d.d + "</span>");
+    b.type = "button"; b.dataset.id = d.id; b.setAttribute("role", "tab"); b.addEventListener("click", function () { showData(d.id); }); tabs.appendChild(b);
+  });
+  showData("shot");
 })();
 </script>
 </body>
