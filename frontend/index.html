@@ -250,9 +250,9 @@ footer a { color: var(--fg); }
       <path class="track" d="M30 100 C 200 100, 220 40, 380 40 S 600 110, 760 110 S 930 50, 1070 50"/>
       <path class="live" d="M30 100 C 200 100, 220 40, 380 40 S 600 110, 760 110 S 930 50, 1070 50"/>
       <circle class="stop" cx="30" cy="100" r="13"/><text x="14" y="138">Home</text>
-      <circle class="stop" cx="380" cy="40" r="13"/><text x="330" y="20">Leave by 8:20</text>
-      <circle class="stop" cx="760" cy="110" r="13"/><text x="700" y="142">Arrive 8:50</text>
-      <circle class="stop end" cx="1070" cy="50" r="13"/><text x="968" y="92">Class 9:00</text>
+      <circle class="stop" cx="380" cy="40" r="13"/><text x="300" y="20">Leave by 8:20 AM</text>
+      <circle class="stop" cx="760" cy="110" r="13"/><text x="670" y="142">Arrive 8:50 AM</text>
+      <circle class="stop end" cx="1070" cy="50" r="13"/><text x="930" y="92">Class 9:00 AM</text>
     </svg>
   </header>
 
@@ -413,7 +413,7 @@ footer a { color: var(--fg); }
     upload: function () {
       userMsg("<b>/schedule upload</b> image: <span class='mono'>fall-2026.png</span> semester: <span class='mono'>(optional)</span>");
       typingThen(function () {
-        botMsg("Here's what I read from your screenshot:<ul><li><b>CSE 565</b> Software Verification<br><span class='time'>Mon Wed 09:00-10:15</span> BYENG 210</li><li><b>CSE 572</b> Data Mining<br><span class='time'>Mon Wed 13:30-14:45</span> GWC 487</li></ul><p style='margin-top:10px;color:var(--mute)'>Press Confirm to save it, or Cancel to discard it.</p>", function (r, b) {
+        botMsg("Here's what I read from your screenshot:<ul><li><b>CSE 565</b> Software Verification<br><span class='time'>Mon Wed 9:00-10:15 AM</span> BYENG 210</li><li><b>CSE 572</b> Data Mining<br><span class='time'>Mon Wed 1:30-2:45 PM</span> GWC 487</li></ul><p style='margin-top:10px;color:var(--mute)'>Press Confirm to save it, or Cancel to discard it.</p>", function (r, b) {
           var row = el("div", "btns"), ok = el("button", "dbtn ok", "Confirm"), no = el("button", "dbtn no", "Cancel");
           ok.type = no.type = "button";
           function finish(msg) { ok.disabled = no.disabled = true; typingThen(function () { botMsg(msg); }, 500); }
@@ -426,7 +426,7 @@ footer a { color: var(--fg); }
     view: function () {
       userMsg("<b>/schedule view</b>");
       typingThen(function () {
-        botMsg("<b>Fall 2026</b><div class='row'><span>CSE 565 Software Verification<br><small style='color:var(--mute)'>BYENG 210</small></span><span class='time'>Mon Wed 09:00-10:15</span></div><div class='row'><span>CSE 572 Data Mining<br><small style='color:var(--mute)'>GWC 487</small></span><span class='time'>Mon Wed 13:30-14:45</span></div>");
+        botMsg("<b>Fall 2026</b><div class='row'><span>CSE 565 Software Verification<br><small style='color:var(--mute)'>BYENG 210</small></span><span class='time'>Mon Wed 9:00-10:15 AM</span></div><div class='row'><span>CSE 572 Data Mining<br><small style='color:var(--mute)'>GWC 487</small></span><span class='time'>Mon Wed 1:30-2:45 PM</span></div>");
       }, 700);
     },
     plan: function () {
