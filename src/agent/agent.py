@@ -208,6 +208,12 @@ class AgentService:
         r.setdefault("direction", direction)
         return commute.plan_text(r)[:MAX_RESPONSE_CHARS]
 
+    async def plan_commute(self, discord_user_id: str, discord_guild_id: str, request: str) -> str:
+        """/commute plan: understand the request, check the saved timetable, suggest a bus route (and a backup)
+        from the trip planner. The home address goes only to the trip planner."""
+        from .commute_plan import plan_commute
+        return await plan_commute(self, discord_user_id, discord_guild_id, request)
+
     # Commute setup form: home address (required, private), area, usual departure time, transport, matching opt-in.
 
     async def commute_profile(self, discord_user_id: str, discord_guild_id: str) -> dict | None:
