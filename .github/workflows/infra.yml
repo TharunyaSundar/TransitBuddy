@@ -1,0 +1,105 @@
+name: Infrastructure
+
+# Manual only: nothing deploys on push. Run it from the Actions tab.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [plan, apply, destroy]
+        default: plan
+      git_ref:
+        description: Branch, tag or commit the server should run (apply only)
+        type: string
+        default: main
+
+permissions:
+  id-token: write # OIDC to AWS
+  contents: read
+
+concurrency:
+  group: infra
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  TF_INPUT: "false"
+
+jobs:
+  terraform:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.12"
+
+      - name: Terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=transitbuddy/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="use_lockfile=true" \
+            -backend-config="encrypt=true"
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        if: inputs.action == 'plan'
+        run: terraform plan -var="git_ref=${{ inputs.git_ref }}"
+
+      # The bot's .env lives in SSM (SecureString), never in Terraform state.
+      - name: Store bot .env in SSM
+        if: inputs.action == 'apply'
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+          MONGODB_DATABASE: ${{ vars.MONGODB_DATABASE || 'transit_buddy' }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'ollama' }}
+          LLM_MODEL: ${{ vars.LLM_MODEL || 'glm-5.3-flash:cloud' }}
+          VISION_MODEL: ${{ vars.VISION_MODEL }}
+          LLM_REASONING: ${{ vars.LLM_REASONING || 'low' }}
+          OLLAMA_BASE_URL: ${{ vars.OLLAMA_BASE_URL || 'https://ollama.com' }}
+          DEFAULT_TIMEZONE: ${{ vars.DEFAULT_TIMEZONE || 'America/Phoenix' }}
+        run: |
+          for v in DISCORD_TOKEN DISCORD_CLIENT_ID DISCORD_GUILD_ID MONGODB_URI OLLAMA_API_KEY; do
+            [ -n "${!v}" ] || { echo "::error::Missing GitHub secret $v"; exit 1; }
+          done
+          umask 077
+          for v in DISCORD_TOKEN DISCORD_CLIENT_ID DISCORD_GUILD_ID MONGODB_URI MONGODB_DATABASE \
+                   LLM_PROVIDER LLM_MODEL VISION_MODEL LLM_REASONING OLLAMA_BASE_URL OLLAMA_API_KEY \
+                   DEFAULT_TIMEZONE; do
+            printf '%s=%s\n' "$v" "${!v}"
+          done > "$RUNNER_TEMP/bot.env"
+          printf 'APP_ENV=production\n' >> "$RUNNER_TEMP/bot.env"
+          aws ssm put-parameter --name /transitbuddy/env --type SecureString --overwrite \
+            --value "file://$RUNNER_TEMP/bot.env" > /dev/null
+          rm -f "$RUNNER_TEMP/bot.env"
+
+      - name: Terraform apply
+        if: inputs.action == 'apply'
+        run: terraform apply -auto-approve -var="git_ref=${{ inputs.git_ref }}"
+
+      - name: Terraform destroy
+        if: inputs.action == 'destroy'
+        run: terraform destroy -auto-approve
+
+      - name: Delete bot .env from SSM
+        if: inputs.action == 'destroy'
+        run: aws ssm delete-parameter --name /transitbuddy/env || true

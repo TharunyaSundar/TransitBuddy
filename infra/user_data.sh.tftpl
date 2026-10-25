@@ -1,0 +1,57 @@
+#!/bin/bash
+set -euxo pipefail
+exec > >(tee /var/log/transitbuddy-bootstrap.log) 2>&1
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y git python3-venv python3-pip unzip curl
+
+# 2 GB swap: pip install of langchain can exceed 1 GB RAM on a micro instance.
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
+# AWS CLI v2 (to read the .env parameter)
+if ! command -v aws >/dev/null; then
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+  unzip -q /tmp/awscliv2.zip -d /tmp
+  /tmp/aws/install
+fi
+
+useradd --system --create-home --shell /usr/sbin/nologin transitbuddy || true
+APP=/opt/transitbuddy
+rm -rf "$APP"
+git clone ${repo_url} "$APP"
+git -C "$APP" checkout ${git_ref}
+
+python3 -m venv "$APP/.venv"
+"$APP/.venv/bin/pip" install --no-cache-dir -r "$APP/requirements.txt"
+
+aws ssm get-parameter --region ${region} --name ${env_parameter_name} \
+  --with-decryption --query Parameter.Value --output text > "$APP/.env"
+chmod 600 "$APP/.env"
+chown -R transitbuddy:transitbuddy "$APP"
+
+cat > /etc/systemd/system/transitbuddy.service <<'UNIT'
+[Unit]
+Description=Transit Buddy Discord bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=transitbuddy
+WorkingDirectory=/opt/transitbuddy
+ExecStart=/opt/transitbuddy/.venv/bin/python -u -m src
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now transitbuddy

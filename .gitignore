@@ -10,3 +10,8 @@ __pycache__/
 .venv/
 .pytest_cache/
 *.egg-info/
+
+# Terraform
+.terraform/
+*.tfstate*
+crash.log
