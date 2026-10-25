@@ -31,11 +31,11 @@ Transit Buddy combines a Discord interface, a MongoDB-backed data layer, and a L
 - Shared Pydantic contracts for communication between teams
 - Environment configuration handling
 - Documentation for responsibilities and integration contracts
-- Initialization-only application entry point
+- Python Discord client with `/ping`, `/status`, and mention responses
+- Guild slash-command registration script
 
 ## Technology Stack
 
-- JavaScript: primary language for all modules and scripts.
 - Python 3.11+: runtime environment for the bot and project scripts.
 - discord.py: Discord client, command handling, and bot interactions.
 - MongoDB Atlas: cloud database for student, schedule, commute, and ride data.
@@ -130,7 +130,12 @@ pytest
 
 ## Discord Setup
 
-Developer 1 must create a Discord application in the Discord developer portal, configure bot permissions, and invite the bot to the testing Discord server used for ASU campus coordination.
+Create a Discord application, configure bot permissions, and invite it to the testing server. Set `DISCORD_TOKEN` and `DISCORD_GUILD_ID` in `.env`, then start the bot and register its guild commands:
+
+```bash
+python -m src
+python -m scripts.register_discord_commands
+```
 
 ## MongoDB Setup
 
@@ -155,7 +160,7 @@ The integration flow is intentionally simple:
 The minimum hackathon scope includes:
 
 - initial project foundation and contract definitions
-- Discord bot shell and command registration placeholder
+- Discord bot shell with `/ping` and `/status` commands
 - MongoDB service placeholders and data contracts
 - LangChain agent skeleton and skill templates
 - schedule extraction workflow from screenshots
