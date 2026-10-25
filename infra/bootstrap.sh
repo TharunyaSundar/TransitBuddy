@@ -4,6 +4,12 @@
 set -euo pipefail
 
 REPO="${REPO:-TharunyaSundar/TransitBuddy}"
+# GitHub now puts immutable ids in the OIDC subject: repo:<owner>@<owner_id>/<repo>@<repo_id>:...
+# Allow both forms (still main branch of this repo only).
+OWNER_ID="${OWNER_ID:-158185196}"
+REPO_ID="${REPO_ID:-1432840244}"
+SUB_NAME="repo:${REPO}:ref:refs/heads/main"
+SUB_ID="repo:${REPO%%/*}@${OWNER_ID}/${REPO##*/}@${REPO_ID}:ref:refs/heads/main"
 REGION="${AWS_REGION:-us-east-1}"
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 BUCKET="transitbuddy-tfstate-${ACCOUNT_ID}"
@@ -38,7 +44,7 @@ TRUST=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Federated":"$OIDC_ARN"},
 "Action":"sts:AssumeRoleWithWebIdentity",
 "Condition":{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com",
-"token.actions.githubusercontent.com:sub":"repo:${REPO}:ref:refs/heads/main"}}}]}
+"token.actions.githubusercontent.com:sub":["${SUB_NAME}","${SUB_ID}"]}}}]}
 JSON
 )
 if aws iam get-role --role-name "$ROLE" >/dev/null 2>&1; then
