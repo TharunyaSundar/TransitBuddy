@@ -41,8 +41,8 @@ def interaction(user="1001"):
                            followup=FakeFollowup())
 
 
-def member(uid, bot=False):
-    return SimpleNamespace(id=int(uid), bot=bot)
+def member(uid, bot=False, name=None):
+    return SimpleNamespace(id=int(uid), bot=bot, display_name=name)
 
 
 def agent_for(db=None):
@@ -132,7 +132,7 @@ def test_plan_impossible_and_no_info():
                     constraints="Priya not before 8:40"))
     assert "Priya can't leave until 8:40 AM but would have to leave by 8:30 AM" in out["content"]
     out = reply(run("plan", agent_for(), classmate1=member(1002), day="saturday"))
-    assert "I don't have classes or saved times on Saturday for you or Priya" in out["content"]
+    assert out["content"].startswith("You and Priya have no classes on Saturday. Try again and set arrive_by")
     out = reply(run("plan", agent_for(), classmate1=member(1002), day="saturday", arrive_by="10:00 AM",
                     travel_minutes=25))
     assert "**Proposed departure: 8:00 AM** on Saturday" in out["content"]
@@ -157,3 +157,23 @@ def test_not_ready_and_failures_are_friendly():
     inter = interaction()
     asyncio.run(build_commute_group(lambda: Broken()).get_command("availability").callback(inter))
     assert "try again" in reply(inter)["content"]
+
+
+def test_plan_without_saved_departure_times_says_leave_by_not_midnight():
+    # the screenshot case: nobody has a usual departure time, arrive by 8:00 AM, default 30-minute trip
+    db = demo_database()
+    db.preferences.clear()
+    out = reply(run("plan", agent_for(db), classmate1=member(1002, name="Priya"), day="saturday",
+                    arrive_by="8:00 AM"))["content"]
+    assert out.startswith("**Leave by 7:30 AM** on Saturday")
+    assert "12:00 AM" not in out
+    assert "- You: by 7:30 AM (must arrive by 8:00 AM)" in out
+    assert "- Priya: by 7:30 AM (must arrive by 8:00 AM)" in out
+
+
+def test_replies_use_discord_names_for_students_without_a_profile():
+    out = reply(run("plan", agent_for(), classmate1=member(5005, name="Riya")))["content"]
+    assert "Riya hasn't saved a schedule yet. Ask them to run /schedule upload." in out
+    assert "a classmate" not in out
+    out = reply(run("availability", agent_for(), classmate1=member(5005, name="Riya")))["content"]
+    assert "- Riya: no saved schedule" in out

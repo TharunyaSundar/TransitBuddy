@@ -48,13 +48,14 @@ def day_availability(user_id: str, schedule: dict | None, preferences: dict | No
     return a
 
 
-def departure_window(av: DayAvailability, direction: str, travel_min: int,
-                     stated: dict | None = None, arrive_by: str | None = None) -> tuple[int, int, list[str]] | None:
+def departure_window(av: DayAvailability, direction: str, travel_min: int, stated: dict | None = None,
+                     arrive_by: str | None = None) -> tuple[int | None, int, list[str]] | None:
     """The (earliest, latest) departure in minutes for a trip `direction` ("to_campus"/"from_campus").
 
     Sources, strongest first: what the student said in this conversation (`stated` earliest/latest HH:mm),
     their saved usual_departure_window, then their class times. `arrive_by` (HH:mm) is a group arrival time
     that replaces the class-based one. None if nothing tells us when they must arrive or leave.
+    The earliest time is None when nobody said when this person can leave.
     """
     stated = stated or {}
     pref = parse_window(av.preferred_window) if av.preferred_window else None
@@ -67,7 +68,7 @@ def departure_window(av: DayAvailability, direction: str, travel_min: int,
         if target:
             latest = to_minutes(target) - travel_min
             why.append(f"must arrive by {display(target)}")
-        earliest = 0
+        earliest = None  # unknown, not midnight: nobody said when they can leave
         if pref:
             earliest = pref[0]
             latest = min(latest, pref[1]) if not target else latest
@@ -75,12 +76,13 @@ def departure_window(av: DayAvailability, direction: str, travel_min: int,
     else:
         if not av.has_classes and not stated and not pref:
             return None
-        earliest, latest = 0, END_OF_DAY
+        earliest, latest = None, END_OF_DAY
         if av.earliest_leave_campus:
             earliest = to_minutes(av.earliest_leave_campus)
             why.append(f"classes over at {display(av.last_class_end)}")
         if pref:
-            earliest, latest = max(earliest, pref[0]), max(pref[1], earliest)
+            earliest = pref[0] if earliest is None else max(earliest, pref[0])
+            latest = max(pref[1], earliest)
             why.append(f"usually leaves {_window_text(av.preferred_window)}")
     if stated.get("earliest"):
         earliest = to_minutes(stated["earliest"])

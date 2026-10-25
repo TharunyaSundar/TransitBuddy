@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .. import db as dbcall
 from ..logic.availability import day_availability, departure_window
 from ..logic.matching import find_matches
-from ..logic.negotiation import negotiate
+from ..logic.negotiation import negotiate, window_text
 from ..logic.schedule import format_schedule, normalize_schedule
 from ..logic.timeutil import display, from_minutes, normalize_time, parse_window, resolve_day, to_minutes
 
@@ -34,6 +34,7 @@ class AgentContext:
     mentioned_user_ids: list[str] = field(default_factory=list)
     now: datetime | None = None
     pending: dict = field(default_factory=dict)  # pending schedules by user id (shared with AgentService)
+    display_names: dict = field(default_factory=dict)  # user id -> name Discord showed, used before the database
     events: dict = field(default_factory=dict)  # facts for the response metadata
 
 
@@ -49,6 +50,8 @@ def _now(ctx: AgentContext) -> datetime:
 async def _name(ctx: AgentContext, user_id: str) -> str:
     if user_id == ctx.discord_user_id:
         return "you"
+    if ctx.display_names.get(user_id):
+        return ctx.display_names[user_id]
     s = await dbcall.call(ctx.db, "get_student", ctx.discord_guild_id, user_id)
     return (s or {}).get("display_name") or "a classmate"
 
@@ -244,17 +247,19 @@ async def propose_group_departure(runtime: ToolRuntime[AgentContext], day: str =
             times.setdefault("latest", from_minutes(to_minutes(arrive) - travel_minutes))
         stated.setdefault(uid, {}).update(times)
     target = normalize_time(arrive_by) if arrive_by else None
-    windows, missing = {}, []
+    windows, missing, no_schedule = {}, [], []
     for uid in group:
         av, _, _ = await _availability(ctx, uid, d)
         w = departure_window(av, direction, travel_minutes, stated.get(uid), target)
         if w is None:
             missing.append(names[uid])
+            if "no confirmed schedule" in av.notes:
+                no_schedule.append(names[uid])
         else:
             windows[uid] = w
     if not windows or missing:
         need = "what time they need to be on campus" if direction == "to_campus" else "when they can leave"
-        return _out({"ok": False, "code": "no_info", "day": d, "noInfoFor": missing,
+        return _out({"ok": False, "code": "no_info", "day": d, "noInfoFor": missing, "noScheduleFor": no_schedule,
                      "error": f"No classes or saved times on {d} for {', '.join(missing)}. Ask {need} "
                               "(then pass arrive_by or stated_constraints). Don't suggest a time yourself."})
     result = negotiate(windows)
@@ -267,8 +272,8 @@ async def propose_group_departure(runtime: ToolRuntime[AgentContext], day: str =
     for k in ("proposedDeparture", "compromiseDeparture"):
         if k in result:
             result[k] = display(result[k])
-    result["windows"] = {names[u]: f"{display(from_minutes(w[0]))}-{display(from_minutes(w[1]))}"
-                         + (f" ({'; '.join(w[2])})" if w[2] else "") for u, w in windows.items()}
+    result["windows"] = {names[u]: window_text(w[0], w[1]) + (f" ({'; '.join(w[2])})" if w[2] else "")
+                         for u, w in windows.items()}
     result.update(ok=True, day=d, direction=direction, travelMinutesAssumed=travel_minutes)
     result["constraintsUsed"] = {names[u]: c for u, c in stated.items()}
     if ignored:

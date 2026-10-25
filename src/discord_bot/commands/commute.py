@@ -23,6 +23,11 @@ def _classmates(interaction: discord.Interaction, *members: discord.Member | Non
     return list(dict.fromkeys(str(m.id) for m in members if m is not None and not m.bot and m.id != me))
 
 
+def _names(*members: discord.Member | None) -> dict[str, str]:
+    """{user id: name shown in this server} for the classmates, so replies use names, not "a classmate"."""
+    return {str(m.id): m.display_name for m in members if m is not None and getattr(m, "display_name", None)}
+
+
 async def _answer(interaction: discord.Interaction, get_agent, call, private: bool = True) -> None:
     agent = get_agent()
     if agent is None:
@@ -50,7 +55,9 @@ def build_commute_group(get_agent: Callable[[], object]) -> app_commands.Group:
                            classmate3: discord.Member | None = None) -> None:
         user, guild = str(interaction.user.id), str(interaction.guild_id)
         others = _classmates(interaction, classmate1, classmate2, classmate3)
-        await _answer(interaction, get_agent, lambda a: a.commute_availability(user, guild, day, others))
+        names = _names(classmate1, classmate2, classmate3)
+        await _answer(interaction, get_agent,
+                      lambda a: a.commute_availability(user, guild, day, others, display_names=names))
 
     @group.command(name="match", description="Find opted-in students from your area with similar times.")
     @app_commands.describe(day=f"Which day: {DAY_HELP}", direction="Going to campus or leaving it",
@@ -65,7 +72,9 @@ def build_commute_group(get_agent: Callable[[], object]) -> app_commands.Group:
         user, guild = str(interaction.user.id), str(interaction.guild_id)
         way = direction.value if direction else "to_campus"
         others = _classmates(interaction, classmate1, classmate2, classmate3)
-        await _answer(interaction, get_agent, lambda a: a.commute_match(user, guild, day, way, around, others))
+        names = _names(classmate1, classmate2, classmate3)
+        await _answer(interaction, get_agent,
+                      lambda a: a.commute_match(user, guild, day, way, around, others, display_names=names))
 
     @group.command(name="plan", description="Propose one departure time for you and your classmates.")
     @app_commands.describe(classmate1="A classmate in the group", classmate2="Another classmate",
@@ -89,7 +98,8 @@ def build_commute_group(get_agent: Callable[[], object]) -> app_commands.Group:
                                                     ephemeral=True)
             return
         await _answer(interaction, get_agent,
-                      lambda a: a.commute_plan(user, guild, others, day, way, travel_minutes, arrive_by, constraints),
+                      lambda a: a.commute_plan(user, guild, others, day, way, travel_minutes, arrive_by, constraints,
+                                               display_names=_names(classmate1, classmate2, classmate3)),
                       private=not share)
 
     return group

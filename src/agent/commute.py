@@ -74,11 +74,24 @@ def match_text(r: dict) -> str:
 def plan_text(r: dict, travel_given: bool) -> str:
     if not r.get("ok"):
         if r.get("code") == "no_info":
-            need = ("set arrive_by to when you need to be on campus" if r.get("direction", "to_campus") == "to_campus"
+            no_schedule = r.get("noScheduleFor") or []
+            no_class = [n for n in r.get("noInfoFor") or [] if n not in no_schedule]
+            when = ("set arrive_by to when you need to be on campus" if r.get("direction", "to_campus") == "to_campus"
                     else "add a constraint like \"I can leave after 3 PM\"")
-            return (f"I don't have classes or saved times on {r['day']} for {_names(r['noInfoFor'], 'or')}, "
-                    f"so I can't propose a time. Try again and {need}, or add constraints like "
-                    "\"Priya can't leave before 8:30 AM\".")
+            parts = []
+            if "you" in no_schedule:
+                parts.append("You haven't saved a schedule yet: use /schedule upload.")
+            others = [n for n in no_schedule if n != "you"]
+            if others:
+                verb = "hasn't" if len(others) == 1 else "haven't"
+                parts.append(f"{_names(others)} {verb} saved a schedule yet. Ask them to run /schedule upload.")
+            if no_class:
+                who = _names(no_class)
+                who = "Y" + who[1:] if who.startswith("you") else who
+                verb = "have" if len(no_class) > 1 or no_class == ["you"] else "has"
+                parts.append(f"{who} {verb} no classes on {r['day']}.")
+            parts.append(f"Try again and {when}." if no_class else f"Or try again and {when}.")
+            return " ".join(parts)
         if r.get("code") == "need_group":
             return "Add at least one classmate to plan with."
         return r.get("error", "I couldn't plan a departure right now.")
@@ -89,7 +102,11 @@ def plan_text(r: dict, travel_given: bool) -> str:
         lines += [f"- {_who(n)} {why}" for n, why in r["participants"].items()]
         lines.append(trip)
         return "\n".join(lines)
-    if r["status"] == "agreed":
+    if r["status"] == "agreed" and r.get("leaveBy"):
+        lines = [f"**Leave by {r['proposedDeparture']}** on {r['day']}",
+                 "That's the latest time that gets everyone there on time. Nobody has a usual departure time "
+                 "saved, so leave earlier if you can."]
+    elif r["status"] == "agreed":
         lines = [f"**Proposed departure: {r['proposedDeparture']}** on {r['day']}",
                  f"Everyone can leave between {_window(r['commonWindow']).replace('-', ' and ')}."]
     else:

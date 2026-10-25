@@ -165,32 +165,35 @@ class AgentService:
 
     # Slash commands: structured input, answered by the tools directly (no language model).
 
-    def _command_context(self, user_id: str, guild_id: str, classmate_ids=()) -> AgentContext:
+    def _command_context(self, user_id: str, guild_id: str, classmate_ids=(), display_names=None) -> AgentContext:
         group = [u for u in dict.fromkeys(classmate_ids or []) if u and u != user_id]
         return AgentContext(discord_user_id=user_id, discord_guild_id=guild_id or "dm", db=self.db,
-                            mentioned_user_ids=group, now=self.clock(), pending=self.pending)
+                            mentioned_user_ids=group, now=self.clock(), pending=self.pending,
+                            display_names=dict(display_names or {}))
 
     async def commute_availability(self, discord_user_id: str, discord_guild_id: str, day: str = "today",
-                                   classmate_ids: list[str] | None = None) -> str:
-        """When the student (and any classmates) must be on campus and when their classes are over."""
-        ctx = self._command_context(discord_user_id, discord_guild_id, classmate_ids)
+                                   classmate_ids: list[str] | None = None, display_names: dict | None = None) -> str:
+        """When the student (and any classmates) must be on campus and when their classes are over.
+        display_names: {user id: name shown in Discord}, used instead of the database when given."""
+        ctx = self._command_context(discord_user_id, discord_guild_id, classmate_ids, display_names)
         return commute.availability_text(await commute.run_tool(get_availability, ctx, day=day))
 
     async def commute_match(self, discord_user_id: str, discord_guild_id: str, day: str = "today",
                             direction: str = "to_campus", around: str | None = None,
-                            classmate_ids: list[str] | None = None) -> str:
+                            classmate_ids: list[str] | None = None, display_names: dict | None = None) -> str:
         """Opted-in students from the same general area with compatible times."""
-        ctx = self._command_context(discord_user_id, discord_guild_id, classmate_ids)
+        ctx = self._command_context(discord_user_id, discord_guild_id, classmate_ids, display_names)
         r = await commute.run_tool(find_commute_partners, ctx, day=day, direction=direction,
                                    around_time=around)
         return commute.match_text(r)
 
     async def commute_plan(self, discord_user_id: str, discord_guild_id: str, classmate_ids: list[str],
                            day: str = "today", direction: str = "to_campus", travel_minutes: int | None = None,
-                           arrive_by: str | None = None, constraints: str | None = None) -> str:
+                           arrive_by: str | None = None, constraints: str | None = None,
+                           display_names: dict | None = None) -> str:
         """One departure time for the student and classmates, or the closest compromise.
         constraints: sentences separated by ';' or new lines, e.g. "Priya can't leave before 8:30 AM"."""
-        ctx = self._command_context(discord_user_id, discord_guild_id, classmate_ids)
+        ctx = self._command_context(discord_user_id, discord_guild_id, classmate_ids, display_names)
         items = [c.strip() for c in (constraints or "").replace("\n", ";").split(";") if c.strip()]
         r = await commute.run_tool(propose_group_departure, ctx, day=day, direction=direction,
                                    travel_minutes=travel_minutes or commute.DEFAULT_TRAVEL_MIN,

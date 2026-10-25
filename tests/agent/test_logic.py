@@ -131,6 +131,18 @@ class Negotiation(unittest.TestCase):
         self.assertEqual(r["fitsEveryoneExcept"][0]["discord_user_id"], "c")
         self.assertEqual(r["fitsEveryoneExcept"][0]["minutesToMove"], 15)  # 8:30 -> 8:15
 
+    def test_unknown_earliest_is_not_midnight(self):
+        r = negotiate({"a": (None, 450, []), "b": (None, 470, [])})
+        self.assertEqual((r["status"], r["proposedDeparture"], r.get("leaveBy")), ("agreed", "07:30", True))
+        r = negotiate({"a": (None, 450, []), "b": (420, 470, [])})  # one known earliest: start there
+        self.assertEqual((r["proposedDeparture"], r["commonWindow"]), ("07:00", "07:00-07:30"))
+        r = negotiate({"a": (None, 450, []), "b": (460, 470, [])})  # conflict: a must leave by 7:30, b from 7:40
+        self.assertEqual((r["status"], r["compromiseDeparture"], r["fits"]), ("conflict", "07:30", ["a"]))
+        self.assertEqual(r["fitsEveryoneExcept"][0]["minutesToMove"], 10)
+        r = negotiate({"a": (None, 450, []), "b": (460, 470, []), "c": (460, 480, [])})  # a is outvoted
+        self.assertEqual((r["compromiseDeparture"], sorted(r["fits"])), ("07:40", ["b", "c"]))
+        self.assertEqual(r["fitsEveryoneExcept"][0]["detail"], "would have to leave later than they said (by 7:30 AM) by 10 min")
+
     def test_impossible_window(self):
         self.assertEqual(negotiate({"a": (500, 480, [])})["status"], "impossible_for_some")
 
