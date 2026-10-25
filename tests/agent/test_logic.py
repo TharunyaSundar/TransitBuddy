@@ -1,14 +1,13 @@
 import unittest
 
-import helpers  # noqa: F401  (sets the path)
-from agent.dev_database import DEMO_GUILD, demo_database
-from agent.logic.availability import day_availability, departure_window
-from agent.logic.matching import find_matches, same_area
-from agent.logic.negotiation import negotiate
-from agent.logic.schedule import classes_on, format_schedule, is_valid_course, normalize_schedule
-from agent.logic.timeutil import display, normalize_days, normalize_time, parse_window, resolve_day, to_minutes
+from transit_buddy.agent.dev_database import DEMO_GUILD, demo_database
+from transit_buddy.agent.logic.availability import day_availability, departure_window
+from transit_buddy.agent.logic.matching import find_matches, same_area
+from transit_buddy.agent.logic.negotiation import negotiate
+from transit_buddy.agent.logic.schedule import classes_on, format_schedule, is_valid_course, normalize_schedule
+from transit_buddy.agent.logic.timeutil import display, normalize_days, normalize_time, parse_window, resolve_day, to_minutes
 
-from helpers import MONDAY_7AM
+from agent_helpers import MONDAY_7AM, get
 
 
 class Time(unittest.TestCase):
@@ -37,17 +36,17 @@ class Time(unittest.TestCase):
 class Schedule(unittest.TestCase):
     def test_normalize_and_warnings(self):
         raw = {"semester": "Fall 2026", "courses": [
-            {"courseCode": "cse110", "courseName": "Principles of Programming", "section": "",
-             "meetingPatterns": [{"days": "Mon/Wed/Fri", "startTime": "9:00 AM", "endTime": "9:50 AM"}],
+            {"course_code": "cse110", "course_name": "Principles of Programming", "section": "",
+             "meeting_patterns": [{"days": "Mon/Wed/Fri", "start_time": "9:00 AM", "end_time": "9:50 AM"}],
              "location": "Tempe - ISTB4 101"},
-            {"courseCode": "MAT 265", "meetingPatterns": [{"days": "MWF", "startTime": "9:30 AM", "endTime": "10:20 AM"}],
+            {"course_code": "MAT 265", "meeting_patterns": [{"days": "MWF", "start_time": "9:30 AM", "end_time": "10:20 AM"}],
              "location": "COOR 170"},
-            {"courseCode": "HST 109", "location": "iCourse"},
-            {"courseCode": "ENG 101", "meetingPatterns": [{"days": "TTh", "startTime": "1:30", "endTime": "2:45"}],
+            {"course_code": "HST 109", "location": "iCourse"},
+            {"course_code": "ENG 101", "meeting_patterns": [{"days": "TTh", "start_time": "1:30", "end_time": "2:45"}],
              "location": "LL 104"}]}
         sched, warnings = normalize_schedule(raw)
-        self.assertEqual(sched["courses"][0]["courseCode"], "CSE 110")
-        self.assertEqual(len(sched["courses"][0]["meetingPatterns"]), 3)
+        self.assertEqual(sched["courses"][0]["course_code"], "CSE 110")
+        self.assertEqual(len(sched["courses"][0]["meeting_patterns"]), 3)
         self.assertTrue(any("overlap" in w for w in warnings))  # CSE 110 and MAT 265 on Monday
         self.assertFalse(any("HST 109" in w for w in warnings))  # online: no times needed
         self.assertTrue(any("ENG 101" in w and "unusual" in w for w in warnings))  # 1:30 read as 01:30
@@ -56,11 +55,11 @@ class Schedule(unittest.TestCase):
 
     def test_classes_on_skips_online(self):
         sched, _ = normalize_schedule({"courses": [
-            {"courseCode": "A 100", "meetingPatterns": [{"days": "M", "startTime": "10:00", "endTime": "11:00"}],
+            {"course_code": "A 100", "meeting_patterns": [{"days": "M", "start_time": "10:00", "end_time": "11:00"}],
              "location": "Online"},
-            {"courseCode": "B 200", "meetingPatterns": [{"days": "M", "startTime": "12:00", "endTime": "13:00"}],
+            {"course_code": "B 200", "meeting_patterns": [{"days": "M", "start_time": "12:00", "end_time": "13:00"}],
              "location": "COOR 170"}]})
-        self.assertEqual([c["courseCode"] for c in classes_on(sched, "Monday")], ["B 200"])
+        self.assertEqual([c["course_code"] for c in classes_on(sched, "Monday")], ["B 200"])
 
 
 class Availability(unittest.TestCase):
@@ -68,12 +67,12 @@ class Availability(unittest.TestCase):
         self.db = demo_database()
 
     def av(self, uid, day="Monday"):
-        return day_availability(uid, self.db.get_student_schedule(DEMO_GUILD, uid),
-                                self.db.get_commute_preferences(DEMO_GUILD, uid), day)
+        return day_availability(uid, get(self.db, "get_student_schedule", DEMO_GUILD, uid),
+                                get(self.db, "get_commute_preferences", DEMO_GUILD, uid), day)
 
     def test_class_vs_commute_availability(self):
         a = self.av("1001")
-        self.assertEqual((a.firstClassStart, a.arriveBy, a.lastClassEnd, a.earliestLeaveCampus),
+        self.assertEqual((a.first_class_start, a.arrive_by, a.last_class_end, a.earliest_leave_campus),
                          ("09:00", "08:50", "09:50", "10:00"))
         self.assertTrue(any("not a confirmed departure" in n for n in a.notes))
 
@@ -86,23 +85,23 @@ class Availability(unittest.TestCase):
         self.assertIsNone(departure_window(self.av("1003", "Friday"), "to_campus", 30))  # no classes Friday
 
     def test_unconfirmed_schedule_noted(self):
-        s = self.db.get_student_schedule(DEMO_GUILD, "1001")
-        s["confirmationStatus"] = "pending_confirmation"
+        s = get(self.db, "get_student_schedule", DEMO_GUILD, "1001")
+        s["confirmation_status"] = "pending_confirmation"
         self.assertIn("schedule not confirmed yet", day_availability("1001", s, None, "Monday").notes)
 
 
 class Matching(unittest.TestCase):
     def test_only_opted_in_same_area_close_times(self):
         db = demo_database()
-        me = db.get_commute_preferences(DEMO_GUILD, "1001")
+        me = get(db, "get_commute_preferences", DEMO_GUILD, "1001")
 
         def av(uid):
-            return day_availability(uid, db.get_student_schedule(DEMO_GUILD, uid),
-                                    db.get_commute_preferences(DEMO_GUILD, uid), "Monday")
-        others = [(db.get_commute_preferences(DEMO_GUILD, u), av(u)) for u in ("1002", "1003", "1004")]
+            return day_availability(uid, get(db, "get_student_schedule", DEMO_GUILD, uid),
+                                    get(db, "get_commute_preferences", DEMO_GUILD, uid), "Monday")
+        others = [(get(db, "get_commute_preferences", DEMO_GUILD, u), av(u)) for u in ("1002", "1003", "1004")]
         matches = find_matches(me, av("1001"), others)
         # Priya: Mesa, opted in, on campus by 8:55 vs 8:50. Jordan: other area. Sam: not opted in.
-        self.assertEqual([m["discordUserId"] for m in matches], ["1002"])
+        self.assertEqual([m["discord_user_id"] for m in matches], ["1002"])
         self.assertEqual(matches[0]["minutesApart"], 5)
         self.assertIn("carpool", matches[0]["sharedModes"])
 
@@ -122,7 +121,7 @@ class Negotiation(unittest.TestCase):
         r = negotiate({"a": (480, 495, []), "b": (480, 500, []), "c": (510, 530, [])})
         self.assertEqual(r["status"], "conflict")
         self.assertEqual(sorted(r["fits"]), ["a", "b"])
-        self.assertEqual(r["fitsEveryoneExcept"][0]["discordUserId"], "c")
+        self.assertEqual(r["fitsEveryoneExcept"][0]["discord_user_id"], "c")
         self.assertEqual(r["fitsEveryoneExcept"][0]["minutesToMove"], 15)  # 8:30 -> 8:15
 
     def test_impossible_window(self):

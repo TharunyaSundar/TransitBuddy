@@ -4,13 +4,15 @@ import asyncio
 import logging
 import sys
 import time
+from pathlib import Path
 
-import helpers  # noqa: F401  (sets the path)
-from dotenv import load_dotenv
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # run as a script from anywhere
 
-from agent import AgentService
-from agent.dev_database import DEMO_GUILD, demo_database
-from helpers import MONDAY_7AM
+from dotenv import load_dotenv  # noqa: E402
+
+from transit_buddy.agent import AgentService
+from transit_buddy.agent.dev_database import DEMO_GUILD, demo_database
+from agent_helpers import MONDAY_7AM
 
 TURNS = [
     ("1001", [], "When can I leave campus today?"),
@@ -31,15 +33,15 @@ async def main() -> None:
     svc = AgentService(demo_database(), clock=lambda: MONDAY_7AM)  # a class day for the demo students
     for user, mentioned, msg in TURNS:
         t = time.time()
-        r = await svc.process_message({"message": msg, "discordUserId": user, "discordGuildId": DEMO_GUILD,
-                                       "channelId": "smoke", "mentionedUserIds": mentioned})
-        meta = {k: v for k, v in r["metadata"].items() if k != "pendingSchedule"}
-        print(f"\n[{user}] {msg}\n  {meta} {time.time() - t:.1f}s\n{r['responseText']}")
-        if "pendingSchedule" in r["metadata"]:
-            print("  pending:", r["metadata"]["pendingSchedule"]["validationWarnings"])
+        r = await svc.process_message({"message": msg, "discord_user_id": user, "discord_guild_id": DEMO_GUILD,
+                                       "channel_id": "smoke", "mentioned_user_ids": mentioned})
+        meta = {k: v for k, v in r.metadata.items() if k != "pending_schedule"}
+        print(f"\n[{user}] {msg}\n  {meta} {time.time() - t:.1f}s\n{r.response_text}")
+        if "pending_schedule" in r.metadata:
+            print("  pending:", r.metadata["pending_schedule"]["validation_warnings"])
     if len(sys.argv) > 1:
         r = await svc.extract_schedule_from_image(open(sys.argv[1], "rb").read(), "image/png", "1004", DEMO_GUILD)
-        print("\n[screenshot]\n" + r["formatted"], "\nwarnings:", r["validationWarnings"])
+        print("\n[screenshot]\n" + svc.format_schedule(r.extracted_schedule), "\nwarnings:", r.validation_warnings)
 
 
 if __name__ == "__main__":

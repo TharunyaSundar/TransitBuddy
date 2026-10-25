@@ -14,7 +14,7 @@ Each domain owns its own directory and is responsible for implementing the parts
 
 ## Boundaries
 
-- The Discord layer does not directly manage Mongoose models.
+- The Discord layer does not directly manage database models.
 - The database layer does not implement Discord handlers.
 - The agent layer does not directly manage Discord commands or bot state.
 

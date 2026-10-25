@@ -11,7 +11,7 @@ Responsibilities:
 1. Create the Discord application.
 2. Configure bot permissions.
 3. Invite the bot to the development Discord server.
-4. Implement the Discord.js client.
+4. Implement the discord.py client.
 5. Implement slash commands.
 6. Handle bot mentions.
 7. Handle screenshot uploads.
@@ -25,13 +25,13 @@ Responsibilities:
 
 Owned area:
 
-- src/discord/
-- scripts/registerDiscordCommands.js
+- transit_buddy/discord_bot/
+- scripts/register_discord_commands.py
 - tests/discord/
 
 Non-goals:
 
-- No Mongoose models.
+- No database models.
 - No LangChain reasoning.
 
 ## Developer 2 — MongoDB Database
@@ -42,7 +42,7 @@ Responsibilities:
 
 1. Create MongoDB Atlas database.
 2. Configure database connectivity.
-3. Create Mongoose models.
+3. Create Pydantic/PyMongo models.
 4. Implement student storage.
 5. Implement class schedule storage.
 6. Implement commute preference storage.
@@ -56,8 +56,8 @@ Responsibilities:
 
 Owned area:
 
-- src/database/
-- scripts/seedDemoData.js
+- transit_buddy/database/
+- scripts/seed_demo_data.py
 - tests/database/
 
 Non-goals:
@@ -71,7 +71,7 @@ Branch: feature/langchain-agent
 
 Responsibilities:
 
-1. Configure LangChain.js.
+1. Configure LangChain (Python).
 2. Configure the selected LLM.
 3. Implement multimodal screenshot extraction.
 4. Implement the AI agent.
@@ -88,14 +88,14 @@ Responsibilities:
 
 Owned area:
 
-- src/agent/
-- src/skills/
+- transit_buddy/agent/
+- transit_buddy/skills/
 - tests/agent/
 
 Non-goals:
 
 - No Discord handlers.
-- No Mongoose models.
+- No database models.
 
 ## Collaboration Rule
 

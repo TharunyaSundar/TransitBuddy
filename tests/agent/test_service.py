@@ -2,13 +2,12 @@ import asyncio
 import json
 import unittest
 
-import helpers  # noqa: F401  (sets the path)
-from agent import AgentService
-from agent.dev_database import DEMO_GUILD, demo_database
-from agent.extraction.schedule_extraction import extract_schedule, parse_json
-from agent.skill_loader import load_skills, select_skills
+from transit_buddy.agent import AgentService
+from transit_buddy.agent.dev_database import DEMO_GUILD, demo_database
+from transit_buddy.agent.extraction.schedule_extraction import extract_schedule, parse_json
+from transit_buddy.agent.skill_loader import load_skills, select_skills
 
-from helpers import MONDAY_7AM, ScriptedModel, tool_results
+from agent_helpers import MONDAY_7AM, ScriptedModel, get, tool_results
 
 
 def run(coro):
@@ -22,20 +21,20 @@ def service(script, db=None, vision=None):
 
 
 def ctx(message, user="1001", mentioned=None):
-    return {"message": message, "discordUserId": user, "discordGuildId": DEMO_GUILD, "channelId": "c1",
-            "mentionedUserIds": mentioned or []}
+    return {"message": message, "discord_user_id": user, "discord_guild_id": DEMO_GUILD, "channel_id": "c1",
+            "mentioned_user_ids": mentioned or []}
 
 
 class ProcessMessage(unittest.TestCase):
     def test_commute_partners_only_opted_in(self):
         svc, model = service([[("find_commute_partners", {"day": "today"})], "Priya is heading in around then."])
         resp = run(svc.process_message(ctx("Anyone heading to ASU around 9 AM?")))
-        self.assertEqual(resp["responseText"], "Priya is heading in around then.")
-        self.assertEqual(resp["metadata"]["toolsCalled"], ["find_commute_partners"])
-        self.assertIn("commute-matching", resp["metadata"]["skillsUsed"])
+        self.assertEqual(resp.response_text, "Priya is heading in around then.")
+        self.assertEqual(resp.metadata["tools_called"], ["find_commute_partners"])
+        self.assertIn("commute-matching", resp.metadata["skills_used"])
         result = json.loads(tool_results(model)[0])
         self.assertEqual([m["who"] for m in result["matches"]], ["Priya"])  # Sam (not opted in) excluded
-        self.assertNotIn("discordUserId", result["matches"][0])
+        self.assertNotIn("discord_user_id", result["matches"][0])
 
     def test_group_departure_agreed(self):
         svc, model = service([[("propose_group_departure", {"day": "today", "travel_minutes": 25})], "ok"])
@@ -81,18 +80,18 @@ class ProcessMessage(unittest.TestCase):
 
     def test_typed_schedule_is_prepared_not_saved(self):
         db = demo_database()
-        db.delete_student_schedule(DEMO_GUILD, "1001")
+        get(db, "delete_student_schedule", DEMO_GUILD, "1001")
         svc, _ = service([[("prepare_schedule_from_text", {"semester": "Fall 2026", "classes": [
-            {"courseCode": "CSE 110", "days": "MWF", "startTime": "9:00 AM", "endTime": "9:50 AM",
+            {"course_code": "CSE 110", "days": "MWF", "start_time": "9:00 AM", "end_time": "9:50 AM",
              "location": "Tempe - ISTB4 101"}]})], "Here's what I got. Press Confirm to save."], db=db)
         resp = run(svc.process_message(ctx("My classes: CSE 110 MWF 9-9:50 ISTB4 101")))
-        pend = resp["metadata"]["pendingSchedule"]
-        self.assertTrue(pend["confirmationRequired"])
-        self.assertEqual(pend["extractedSchedule"]["courses"][0]["meetingPatterns"][0]["startTime"], "09:00")
-        self.assertIsNone(db.get_student_schedule(DEMO_GUILD, "1001"))  # nothing persisted
+        pend = resp.metadata["pending_schedule"]
+        self.assertTrue(pend["confirmation_required"])
+        self.assertEqual(pend["extracted_schedule"]["courses"][0]["meeting_patterns"][0]["start_time"], "09:00")
+        self.assertIsNone(get(db, "get_student_schedule", DEMO_GUILD, "1001"))  # nothing persisted
         saved = run(svc.save_confirmed_schedule("1001", DEMO_GUILD))
-        self.assertEqual(saved["confirmationStatus"], "confirmed")
-        self.assertEqual(db.get_student_schedule(DEMO_GUILD, "1001")["courses"][0]["courseCode"], "CSE 110")
+        self.assertEqual(saved.confirmation_status, "confirmed")
+        self.assertEqual(get(db, "get_student_schedule", DEMO_GUILD, "1001")["courses"][0]["course_code"], "CSE 110")
         with self.assertRaises(ValueError):
             run(svc.save_confirmed_schedule("1001", DEMO_GUILD))  # pending was cleared
 
@@ -100,6 +99,23 @@ class ProcessMessage(unittest.TestCase):
         svc, model = service([[("save_commute_preferences", {"general_origin_area": "1234 E Main St"})], "ok"])
         run(svc.process_message(ctx("I live at 1234 E Main St")))
         self.assertIn("street address", json.loads(tool_results(model)[0])["error"])
+
+    def test_ride_request_reaches_database_as_model(self):
+        db = demo_database()
+        svc, model = service([[("create_ride_request", {"origin_area": "Mesa", "destination_area": "ASU Tempe campus",
+                                                         "desired_departure_time": "Tuesday 8:00 AM"})], "Posted."], db=db)
+        resp = run(svc.process_message(ctx("post a ride request from Mesa Tuesday 8am")))
+        rid = resp.metadata["ride_request_created"]
+        self.assertEqual(db.rides[rid].status, "open")  # stored as the shared RideRequest model
+        self.assertEqual(db.rides[rid].discord_user_id, "1001")
+
+    def test_save_confirmed_rejects_bad_times(self):
+        svc, _ = service([])
+        bad = {"semester": "Fall 2026", "courses": [{"course_code": "CSE 110", "course_name": "", "section": "",
+               "location": "COOR 170", "meeting_patterns": [{"day_of_week": "Monday", "start_time": "9am",
+                                                             "end_time": "09:50"}]}]}
+        with self.assertRaises(ValueError):
+            run(svc.save_confirmed_schedule("1001", DEMO_GUILD, bad))
 
     def test_cannot_close_someone_elses_ride(self):
         svc, model = service([[("update_my_ride_request", {"request_id": "r-demo1", "status": "cancelled"})], "no"])
@@ -111,11 +127,11 @@ class ProcessMessage(unittest.TestCase):
         svc = AgentService(None, model=model, clock=lambda: MONDAY_7AM)
         resp = run(svc.process_message(ctx("what's my schedule?")))
         self.assertIn("isn't connected", json.loads(tool_results(model)[0])["error"])
-        self.assertEqual(resp["responseText"], "The database isn't connected.")
+        self.assertEqual(resp.response_text, "The database isn't connected.")
 
     def test_empty_message_and_history(self):
         svc, model = service(["first", "second"])
-        self.assertEqual(run(svc.process_message(ctx("  ")))["metadata"]["error"], "empty_message")
+        self.assertEqual(run(svc.process_message(ctx("  "))).metadata["error"], "empty_message")
         run(svc.process_message(ctx("hello")))
         run(svc.process_message(ctx("again")))
         self.assertIn("first", [m.content for m in model.seen[-1]])  # previous answer kept as history
@@ -125,14 +141,14 @@ class ProcessMessage(unittest.TestCase):
             def _generate(self, *a, **k):
                 raise RuntimeError("boom")
         svc = AgentService(demo_database(), model=Broken(script=[], seen=[]), clock=lambda: MONDAY_7AM)
-        self.assertIn("try again", run(svc.process_message(ctx("hi")))["responseText"])
+        self.assertIn("try again", run(svc.process_message(ctx("hi"))).response_text)
 
 
 class ConstraintParsing(unittest.TestCase):
     NAMES = {"1001": "you", "1002": "Priya", "1003": "Jordan Lee"}
 
     def parse(self, text):
-        from agent.tools.agent_tools import parse_constraint
+        from transit_buddy.agent.tools.agent_tools import parse_constraint
         return parse_constraint(text, "1001", self.NAMES)
 
     def test_sentences(self):
@@ -141,8 +157,8 @@ class ConstraintParsing(unittest.TestCase):
         self.assertEqual(self.parse("Jordan is free after 5 pm, has to leave by 6:30 pm"),
                          ("1003", {"earliest": "17:00", "latest": "18:30"}))
         self.assertEqual(self.parse("Sam can leave after 9"), (None, {"earliest": "09:00"}))  # not in the group
-        self.assertEqual(self.parse("I must be on campus by 8:50 AM"), ("1001", {"arriveBy": "08:50"}))
-        self.assertEqual(self.parse("Priya needs to arrive by 9"), ("1002", {"arriveBy": "09:00"}))
+        self.assertEqual(self.parse("I must be on campus by 8:50 AM"), ("1001", {"arrive_by": "08:50"}))
+        self.assertEqual(self.parse("Priya needs to arrive by 9"), ("1002", {"arrive_by": "09:00"}))
 
 
 class Extraction(unittest.TestCase):
@@ -151,21 +167,21 @@ class Extraction(unittest.TestCase):
 
     def test_image_extraction_normalizes_and_holds(self):
         reply = json.dumps({"semester": "Fall 2026", "courses": [
-            {"courseCode": "CSE 110", "courseName": "Principles of Programming", "section": "",
-             "meetingPatterns": [{"days": "Mon Wed Fri", "startTime": "9:00 AM", "endTime": "9:50 AM"}],
+            {"course_code": "CSE 110", "course_name": "Principles of Programming", "section": "",
+             "meeting_patterns": [{"days": "Mon Wed Fri", "start_time": "9:00 AM", "end_time": "9:50 AM"}],
              "location": "Tempe - ISTB4 101"}]})
         db = demo_database()
         svc, _ = service([], db=db, vision=ScriptedModel(script=[f"```json\n{reply}\n```"], seen=[]))
         r = run(svc.extract_schedule_from_image(b"\x89PNG fake", "image/png", "1001", DEMO_GUILD))
-        self.assertTrue(r["confirmationRequired"])
-        self.assertEqual(len(r["extractedSchedule"]["courses"][0]["meetingPatterns"]), 3)
-        self.assertIn("CSE 110", r["formatted"])
+        self.assertTrue(r.confirmation_required)
+        self.assertEqual(len(r.extracted_schedule["courses"][0]["meeting_patterns"]), 3)
+        self.assertIn("CSE 110", svc.format_schedule(r.extracted_schedule))
         self.assertEqual(svc.pending_schedule("1001")["semester"], "Fall 2026")
 
     def test_unreadable_image(self):
         r = run(extract_schedule(ScriptedModel(script=["I can't see a schedule"], seen=[]), b"x", "image/png"))
-        self.assertEqual(r["extractedSchedule"]["courses"], [])
-        self.assertIn("clearer", r["validationWarnings"][0])
+        self.assertEqual(r["extracted_schedule"]["courses"], [])
+        self.assertIn("clearer", r["validation_warnings"][0])
 
 
 class Skills(unittest.TestCase):
