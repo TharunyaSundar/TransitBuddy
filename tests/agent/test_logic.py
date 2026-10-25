@@ -51,10 +51,13 @@ class Schedule(unittest.TestCase):
         self.assertTrue(any("overlap" in w for w in warnings))  # CSE 110 and MAT 265 on Monday
         self.assertFalse(any("HST 109" in w and "time" in w for w in warnings))  # online: no times needed
         self.assertTrue(any("ENG 101" in w and "unusual" in w for w in warnings))  # 1:30 read as 01:30
-        # DatabaseService needs a course name and section: missing ones are flagged so the student is asked
-        self.assertFalse(is_valid_course(sched["courses"][0]))
-        self.assertEqual(missing_for_save(sched["courses"][0]), ["section number"])
-        self.assertTrue(any("CSE 110: section number missing" in w for w in warnings))
+        # course name and section are optional (shared is_valid_course): no warning, still valid
+        self.assertTrue(is_valid_course(sched["courses"][0]))
+        self.assertEqual(missing_for_save(sched["courses"][0]), [])
+        self.assertFalse(any("section" in w or "course name" in w for w in warnings))
+        bad = {**sched["courses"][0], "location": "", "meeting_patterns": [
+            {"day_of_week": "Monday", "start_time": "9am", "end_time": "09:50"}]}
+        self.assertEqual(missing_for_save(bad), ["location", "valid meeting times"])
         self.assertIn("Mon/Wed/Fri 9:00 AM-9:50 AM", format_schedule(sched))
 
     def test_classes_on_skips_online(self):

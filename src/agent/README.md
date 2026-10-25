@@ -59,9 +59,9 @@ agent = AgentService(DatabaseService())
 How the agent works with `src/database`:
 - Every write is validated into the shared model (`StudentSchedule`, `CommutePreferences`, `RideRequest`) before
   it reaches `DatabaseService`, and results are read back with `model_dump()` (`agent/db.py`).
-- `save_schedule` only accepts courses that pass the shared `is_valid_course`, which needs a course name and
-  a section number. The agent warns about missing ones when it reads a schedule, and `save_confirmed_schedule`
-  raises `ValueError` saying which class needs what, so Discord can ask the student before saving.
+- `save_schedule` only accepts courses that pass the shared `is_valid_course`: a course code, a location and
+  valid meeting times (course name and section are optional). The agent applies the same check, and
+  `save_confirmed_schedule` raises `ValueError` saying which class needs what, so Discord can ask the student.
 - `create_ride_request` sends an empty `request_id`, and the database assigns it.
 - If MongoDB is down or not connected, the tool reports a database problem and the agent tells the student;
   the reply doesn't crash.

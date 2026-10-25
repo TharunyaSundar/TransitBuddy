@@ -17,7 +17,8 @@ This guide explains how the project should be developed during the hackathon fou
 1. Clone the repository.
 2. Create a virtualenv and run `pip install -r requirements.txt`.
 3. Copy .env.example to .env when needed.
-4. Use `python -m src` to verify the app starts in initialization mode.
+4. Use `python -m src` to start the app. Without `DISCORD_TOKEN`, startup safely skips Discord login.
+5. Use `python -m scripts.register_discord_commands` to register guild slash commands after configuring `DISCORD_TOKEN` and `DISCORD_GUILD_ID`.
 
 ## Branching
 

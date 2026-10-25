@@ -89,12 +89,8 @@ class ProcessMessage(unittest.TestCase):
         self.assertTrue(pend["confirmation_required"])
         self.assertEqual(pend["extracted_schedule"]["courses"][0]["meeting_patterns"][0]["start_time"], "09:00")
         self.assertIsNone(get(db, "get_student_schedule", DEMO_GUILD, "1001"))  # nothing persisted
-        self.assertTrue(any("section number missing" in w for w in pend["validation_warnings"]))
-        with self.assertRaisesRegex(ValueError, r"CSE 110 \(course name, section number\)"):
-            run(svc.save_confirmed_schedule("1001", DEMO_GUILD))  # the student is asked for these first
-        fixed = svc.pending_schedule("1001")
-        fixed["courses"][0].update(course_name="Principles of Programming", section="12345")
-        saved = run(svc.save_confirmed_schedule("1001", DEMO_GUILD, fixed))
+        self.assertEqual(pend["validation_warnings"], [])  # no name or section needed
+        saved = run(svc.save_confirmed_schedule("1001", DEMO_GUILD))
         self.assertEqual(saved.confirmation_status, "confirmed")
         self.assertEqual(get(db, "get_student_schedule", DEMO_GUILD, "1001")["courses"][0]["course_code"], "CSE 110")
         self.assertIsNone(svc.pending_schedule("1001"))  # pending was cleared

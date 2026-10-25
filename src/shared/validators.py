@@ -27,6 +27,11 @@ def is_valid_time_string(value: Any) -> bool:
     return isinstance(value, str) and _TIME_RE.match(value) is not None
 
 
+def _is_optional_string(value: Any) -> bool:
+    """None or a string (blank allowed)."""
+    return value is None or isinstance(value, str)
+
+
 def is_valid_course(value: Any) -> bool:
     """Validate a basic course dict (snake_case keys, as in contracts.Course)."""
     if not isinstance(value, dict):
@@ -35,8 +40,8 @@ def is_valid_course(value: Any) -> bool:
     patterns = value.get("meeting_patterns")
     return (
         is_non_empty_string(value.get("course_code"))
-        and is_non_empty_string(value.get("course_name"))
-        and is_non_empty_string(value.get("section"))
+        and _is_optional_string(value.get("course_name"))
+        and _is_optional_string(value.get("section"))
         and isinstance(patterns, list)
         and all(
             isinstance(p, dict)

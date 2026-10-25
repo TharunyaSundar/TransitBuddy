@@ -71,11 +71,6 @@ def normalize_schedule(raw: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
             warnings.append(f"{label}: no meeting times found.")
         if not location:
             warnings.append(f"{label}: no location found.")
-        if not str(c.get("course_name") or "").strip():
-            warnings.append(f"{label}: course name missing; it's needed to save the schedule.")
-        if not str(c.get("section") or "").strip():
-            warnings.append(f"{label}: section number missing (the 5-digit class number in My ASU); "
-                            "it's needed to save the schedule.")
         courses.append({
             "course_code": code,
             "course_name": str(c.get("course_name") or "").strip(),
@@ -104,9 +99,8 @@ def _overlaps(courses: list[dict], warnings: list[str]) -> None:
 
 def missing_for_save(c: dict) -> list[str]:
     """What DatabaseService.save_schedule (shared is_valid_course) would reject in this course."""
-    missing = [label for key, label in (("course_code", "course code"), ("course_name", "course name"),
-                                        ("section", "section number"), ("location", "location"))
-               if not is_non_empty_string(c.get(key))]
+    missing = [label for key, label in (("course_code", "course code"), ("location", "location"))
+               if not is_non_empty_string(c.get(key))]  # course_name and section are optional
     if not all(isinstance(p, dict) and is_valid_weekday(p.get("day_of_week")) and is_valid_time_string(p.get("start_time"))
                and is_valid_time_string(p.get("end_time")) for p in c.get("meeting_patterns") or []):
         missing.append("valid meeting times")

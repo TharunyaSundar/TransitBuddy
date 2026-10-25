@@ -45,8 +45,8 @@ class MeetingPattern(BaseModel):
 
 class Course(BaseModel):
     course_code: str  # e.g. CSE 565
-    course_name: str
-    section: str
+    course_name: Optional[str] = None
+    section: Optional[str] = None
     meeting_patterns: list[MeetingPattern] = Field(default_factory=list)
     location: str
 

@@ -122,7 +122,7 @@ def test_preferences_and_ride_requests_persist():
     scenario(t)
 
 
-def test_schedule_confirm_flow_saves_only_complete_schedules():
+def test_schedule_confirm_flow_saves_after_confirm():
     async def t(db, make_agent):
         await db.delete_student_schedule(GUILD, "u1")
         agent, _ = make_agent([[("prepare_schedule_from_text", {"semester": "Fall 2026", "classes": [
@@ -131,14 +131,14 @@ def test_schedule_confirm_flow_saves_only_complete_schedules():
         resp = await agent.process_message(ctx("MAT 265 TTh 10:30-11:45 COOR 170"))
         assert resp.metadata["pending_schedule"]["confirmation_required"]
         assert await db.get_student_schedule(GUILD, "u1") is None  # nothing saved before Confirm
-        with pytest.raises(ValueError, match="section number"):
-            await agent.save_confirmed_schedule("u1", GUILD)
-        fixed = agent.pending_schedule("u1")
-        fixed["courses"][0].update(course_name="Calculus for Engineers I", section="54321")
-        saved = await agent.save_confirmed_schedule("u1", GUILD, fixed)
+        saved = await agent.save_confirmed_schedule("u1", GUILD)  # no course name or section: still saved
         stored = await db.get_student_schedule(GUILD, "u1")
         assert saved.confirmation_status == stored.confirmation_status == "confirmed"
         assert stored.courses[0].meeting_patterns[0].day_of_week == "Tuesday"
+        bad = {"semester": "Fall 2026", "courses": [{"course_code": "MAT 265", "location": "",
+               "meeting_patterns": [{"day_of_week": "Tuesday", "start_time": "10:30", "end_time": "11:45"}]}]}
+        with pytest.raises(ValueError, match=r"MAT 265 \(location\)"):
+            await agent.save_confirmed_schedule("u1", GUILD, bad)  # rejected before reaching MongoDB
     scenario(t)
 
 
