@@ -19,10 +19,18 @@ def test_client_registers_only_ask_and_schedule_commands():
 
     commands = {command.name: command for command in client.tree.get_commands()}
 
-    assert set(commands) == {"ask", "schedule"}
+    assert set(commands) == {"ask", "commute", "schedule"}
     assert isinstance(commands["ask"], discord.app_commands.Command)
     assert isinstance(commands["schedule"], discord.app_commands.Group)
     assert {command.name for command in commands["schedule"].commands} == {"upload", "view"}
+    assert isinstance(commands["commute"], discord.app_commands.Group)
+    assert {command.name for command in commands["commute"].commands} == {"plan"}
+
+    plan = commands["commute"].get_command("plan")
+    assert len(plan.parameters) == 1
+    assert plan.parameters[0].name == "request"
+    assert plan.parameters[0].required
+    assert plan.parameters[0].type is discord.AppCommandOptionType.string
 
 
 def test_ask_passes_discord_context_to_agent_and_replies_privately():

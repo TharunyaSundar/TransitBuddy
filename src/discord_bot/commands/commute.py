@@ -8,6 +8,7 @@ from typing import Callable
 import discord
 from discord import app_commands
 
+from src.agent.commute_response import CommutePlanResponse
 from src.utils.logger import log
 
 from .schedule import NOT_READY
@@ -16,6 +17,55 @@ from .setup import open_setup_form
 DIRECTIONS = [app_commands.Choice(name="to campus", value="to_campus"),
               app_commands.Choice(name="from campus", value="from_campus")]
 DAY_HELP = "today, tomorrow, a weekday (Monday) or a date (2026-10-26)"
+_COMMUTE_COLORS = {
+    "success": discord.Color.green(),
+    "clarification": discord.Color.gold(),
+    "unsupported": discord.Color.orange(),
+    "error": discord.Color.red(),
+}
+_COMMUTE_TITLES = {
+    "success": "🚌 Your Commute Plan",
+    "clarification": "❓ Commute Details Needed",
+    "unsupported": "ℹ️ Commute Plan Not Supported",
+    "error": "⚠️ Commute Plan Unavailable",
+}
+
+
+def commute_plan_embed(result: CommutePlanResponse) -> discord.Embed:
+    """Render an address-free commute result as a concise Discord embed."""
+    embed = discord.Embed(
+        title=_COMMUTE_TITLES[result.status],
+        description=result.description,
+        color=_COMMUTE_COLORS[result.status],
+    )
+    if result.status == "success":
+        course = " — ".join(value for value in (result.course_code, result.course_name) if value)
+        fields = (
+            ("📚 Course", course or None),
+            ("⏰ Class starts", result.class_start_time),
+            ("📍 Campus building", result.campus_building),
+            ("📅 Travel date", result.travel_date),
+            ("🎯 Target arrival", result.target_arrival_time),
+            ("🕒 Estimated commute", f"~{result.estimated_duration_minutes} minutes (estimate)"
+             if result.estimated_duration_minutes is not None else None),
+            ("🚶 Recommended departure", f"~{result.recommended_departure_time} (estimate)"
+             if result.recommended_departure_time else None),
+            ("🚌 Transport", result.transport_mode),
+        )
+        for name, value in fields:
+            if value:
+                embed.add_field(name=name, value=value, inline=True)
+    embed.set_footer(text="Transit conditions may change. Travel duration and departure times are estimates.")
+    return embed
+
+
+def _as_commute_response(result: CommutePlanResponse | str) -> CommutePlanResponse:
+    if isinstance(result, CommutePlanResponse):
+        return result
+    return CommutePlanResponse(
+        status="error",
+        description="I couldn't prepare your commute plan right now. Please try again in a minute.",
+    )
 
 
 def _classmates(interaction: discord.Interaction, *members: discord.Member | None) -> list[str]:
@@ -115,5 +165,39 @@ def build_commute_group(get_agent: Callable[[], object]) -> app_commands.Group:
     async def forget_address(interaction: discord.Interaction) -> None:
         user, guild = str(interaction.user.id), str(interaction.guild_id)
         await _answer(interaction, get_agent, lambda a: a.delete_commute_profile(user, guild))
+
+    return group
+
+
+def build_commute_plan_group(get_agent: Callable[[], object]) -> app_commands.Group:
+    group = app_commands.Group(name="commute", description="Plan your commute to or from campus.",
+                               guild_only=True)
+
+    @group.command(name="plan", description="Plan a campus commute using a natural-language request.")
+    @app_commands.describe(request="Describe where and when you need to travel.")
+    async def plan(interaction: discord.Interaction, request: str) -> None:
+        user, guild = str(interaction.user.id), str(interaction.guild_id or "dm")
+        agent = get_agent()
+        if agent is None:
+            result = CommutePlanResponse(
+                status="error",
+                description="Transit Buddy is unavailable right now. Please try again in a minute.",
+            )
+            await interaction.response.send_message(embed=commute_plan_embed(result), ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            result = await agent.commute_plan_request(user, guild, request)
+        except Exception as error:
+            log(f"/commute plan failed ({type(error).__name__}).")
+            result = CommutePlanResponse(
+                status="error",
+                description="I couldn't prepare your commute plan right now. Please try again in a minute.",
+            )
+        await interaction.followup.send(
+            embed=commute_plan_embed(_as_commute_response(result)),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
 
     return group

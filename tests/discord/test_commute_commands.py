@@ -10,9 +10,15 @@ from zoneinfo import ZoneInfo
 from test_schedule_commands import FakeVision
 
 from src.agent import AgentService
+from src.agent.commute_response import CommutePlanResponse
 from src.agent.dev_database import DEMO_GUILD, InMemoryDatabaseService, demo_database
 from src.discord_bot.client import create_discord_client
-from src.discord_bot.commands.commute import build_commute_group
+from src.discord_bot.commands.commute import (
+    _COMMUTE_COLORS,
+    build_commute_group,
+    build_commute_plan_group,
+    commute_plan_embed,
+)
 from src.discord_bot.commands.schedule import NOT_READY
 
 MONDAY_7AM = datetime(2026, 10, 26, 7, 0, tzinfo=ZoneInfo("America/Phoenix"))
@@ -22,8 +28,8 @@ class FakeResponse:
     def __init__(self):
         self.sent, self.deferred = [], None
 
-    async def send_message(self, content, ephemeral=False):
-        self.sent.append({"content": content, "ephemeral": ephemeral})
+    async def send_message(self, content=None, ephemeral=False, embed=None):
+        self.sent.append({"content": content, "ephemeral": ephemeral, "embed": embed})
 
     async def defer(self, ephemeral=False, thinking=False):
         self.deferred = {"ephemeral": ephemeral, "thinking": thinking}
@@ -33,8 +39,9 @@ class FakeFollowup:
     def __init__(self):
         self.sent = []
 
-    async def send(self, content, ephemeral=False, allowed_mentions=None):
-        self.sent.append({"content": content, "ephemeral": ephemeral, "allowed_mentions": allowed_mentions})
+    async def send(self, content=None, ephemeral=False, allowed_mentions=None, embed=None):
+        self.sent.append({"content": content, "ephemeral": ephemeral, "allowed_mentions": allowed_mentions,
+                          "embed": embed})
 
 
 def interaction(user="1001"):
@@ -63,7 +70,111 @@ def reply(inter) -> dict:
 
 def test_bot_does_not_register_commute_slash_group():
     bot = create_discord_client()
-    assert bot.tree.get_command("commute") is None
+    group = bot.tree.get_command("commute")
+    assert group is not None
+    assert [c.name for c in group.commands] == ["plan"]
+
+
+def test_plan_command_forwards_one_natural_language_request():
+    class FakeAgent:
+        async def commute_plan_request(self, user_id, guild_id, request):
+            self.args = (user_id, guild_id, request)
+            return CommutePlanResponse(
+                status="success",
+                description="Aim to reach your first class by 8:50 AM.",
+                course_name="Software Verification",
+                course_code="CSE 565",
+                class_start_time="9:00 AM",
+                campus_building="BYENG 210",
+                travel_date="Monday, October 26",
+                target_arrival_time="8:50 AM",
+                estimated_duration_minutes=25,
+                recommended_departure_time="8:25 AM",
+                transport_mode="bus or train",
+                estimated=True,
+            )
+
+    agent = FakeAgent()
+    group = build_commute_plan_group(lambda: agent)
+    command = group.get_command("plan")
+    inter = interaction()
+
+    asyncio.run(command.callback(inter, "Get me to campus before my first class tomorrow."))
+
+    assert agent.args == ("1001", DEMO_GUILD, "Get me to campus before my first class tomorrow.")
+    assert inter.response.deferred == {"ephemeral": True, "thinking": True}
+    embed = reply(inter)["embed"]
+    assert reply(inter)["ephemeral"]
+    assert embed.title == "🚌 Your Commute Plan"
+    assert embed.description == "Aim to reach your first class by 8:50 AM."
+    assert [(field.name, field.value) for field in embed.fields] == [
+        ("📚 Course", "CSE 565 — Software Verification"),
+        ("⏰ Class starts", "9:00 AM"),
+        ("📍 Campus building", "BYENG 210"),
+        ("📅 Travel date", "Monday, October 26"),
+        ("🎯 Target arrival", "8:50 AM"),
+        ("🕒 Estimated commute", "~25 minutes (estimate)"),
+        ("🚶 Recommended departure", "~8:25 AM (estimate)"),
+        ("🚌 Transport", "bus or train"),
+    ]
+    assert "Transit conditions may change" in embed.footer.text
+    assert reply(inter)["allowed_mentions"].everyone is False
+
+
+def test_commute_embed_omits_unavailable_optional_fields_and_private_data():
+    result = CommutePlanResponse(
+        status="success",
+        description="Your commute estimate is ready.",
+        course_code="CSE 565",
+    )
+
+    embed = commute_plan_embed(result)
+
+    assert [(field.name, field.value) for field in embed.fields] == [("📚 Course", "CSE 565")]
+    assert "123 Main Street" not in embed.description
+
+
+def test_commute_embed_formats_clarifications_unsupported_and_errors():
+    for status, expected_title in (
+        ("clarification", "❓ Commute Details Needed"),
+        ("unsupported", "ℹ️ Commute Plan Not Supported"),
+        ("error", "⚠️ Commute Plan Unavailable"),
+    ):
+        embed = commute_plan_embed(CommutePlanResponse(status=status, description="Please clarify your request."))
+        assert embed.title == expected_title
+        assert embed.color.value == _COMMUTE_COLORS[status].value
+        assert not embed.fields
+        assert "Please clarify your request." == embed.description
+        assert "Transit conditions may change" in embed.footer.text
+
+
+def test_commute_plan_agent_failure_is_address_free_and_private():
+    class BrokenAgent:
+        async def commute_plan_request(self, *args):
+            raise RuntimeError("private address: 123 Main Street")
+
+    inter = interaction()
+    command = build_commute_plan_group(lambda: BrokenAgent()).get_command("plan")
+    asyncio.run(command.callback(inter, "Get me to campus by 9 AM."))
+    assert inter.response.deferred == {"ephemeral": True, "thinking": True}
+    sent = reply(inter)
+    assert sent["ephemeral"]
+    assert "123 Main Street" not in sent["embed"].description
+    assert "123 Main Street" not in sent["embed"].footer.text
+
+
+def test_legacy_string_response_is_not_displayed():
+    class LegacyAgent:
+        async def commute_plan_request(self, *args):
+            return "Trip starts at 123 Main Street."
+
+    inter = interaction()
+    command = build_commute_plan_group(lambda: LegacyAgent()).get_command("plan")
+    asyncio.run(command.callback(inter, "Get me to campus by 9 AM."))
+
+    embed = reply(inter)["embed"]
+    assert embed.title == "⚠️ Commute Plan Unavailable"
+    assert "123 Main Street" not in embed.description
 
 
 def test_availability_is_private_and_skips_bots_and_self():
@@ -136,7 +247,8 @@ def test_plan_impossible_and_no_info():
 
 def test_plan_needs_someone_else_and_bad_day():
     inter = run("plan", agent_for(), classmate1=member(1001))
-    assert inter.response.sent[0] == {"content": "Add at least one classmate other than yourself.", "ephemeral": True}
+    assert inter.response.sent[0]["content"] == "Add at least one classmate other than yourself."
+    assert inter.response.sent[0]["ephemeral"] is True
     out = reply(run("availability", agent_for(), day="someday"))
     assert "can't read the day" in out["content"]
 

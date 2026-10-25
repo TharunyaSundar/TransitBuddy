@@ -14,9 +14,11 @@
 """
 import asyncio
 import logging
+import re
 import time
 from collections import defaultdict, deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -25,14 +27,17 @@ from ..shared.constants import DEFAULT_CAMPUS, DEFAULT_TIMEZONE, DEFAULT_UNIVERS
 from ..shared.contracts import AgentResponse, ProcessMessageContext, ScheduleExtractionResult, StudentSchedule
 from . import commute
 from . import db as dbcall
+from .commute_response import CommutePlanResponse
+from .commute_intent import IntentExtractionError, TravelIntent, extract_travel_intent
 from .extraction.schedule_extraction import extract_schedule
-from .llm import create_chat_model, create_vision_model
+from .llm import chat_timeout_s, create_chat_model, create_vision_model
 from .logic.schedule import format_schedule, is_valid_course, missing_for_save
 from .logic.timeutil import display, from_minutes, parse_window
 from .logic.timeutil import now as tz_now
+from .schedule_planner import ScheduleAwarePlan, arrival_buffer_minutes, plan_from_schedule
 from .prompts.system_prompt import build_system_prompt
 from .skill_loader import load_skills, select_skills, skills_prompt
-from .travel import TravelService
+from .travel import MODE_WORDS, TravelService, planner_mode
 from .tools.agent_tools import (ALL_TOOLS, AgentContext, find_commute_partners, get_availability,
                                  propose_group_departure)
 
@@ -207,6 +212,264 @@ class AgentService:
                                    arrive_by=arrive_by, stated_constraints=items)
         r.setdefault("direction", direction)
         return commute.plan_text(r)[:MAX_RESPONSE_CHARS]
+
+    async def commute_plan_request(
+        self, discord_user_id: str, discord_guild_id: str, request: str
+    ) -> CommutePlanResponse:
+        """Resolve natural-language commute intent against the authenticated student's schedule."""
+        if not request.strip():
+            return CommutePlanResponse(
+                status="clarification",
+                description="Describe where and when you need to travel, for example: get me to campus before your first class tomorrow.",
+            )
+
+        if self.db is None:
+            return CommutePlanResponse(
+                status="error",
+                description="I couldn't access your saved travel profile or schedule right now. Please try again in a minute.",
+            )
+        try:
+            profile = await dbcall.call(self.db, "get_student", discord_guild_id or "dm", discord_user_id)
+        except Exception as error:
+            log.warning("commute profile lookup failed: %s", type(error).__name__)
+            return CommutePlanResponse(
+                status="error",
+                description="I couldn't access your saved travel profile right now. Please try again in a minute.",
+            )
+
+        timezone_name = (profile or {}).get("timezone") or DEFAULT_TIMEZONE
+        try:
+            local_zone = ZoneInfo(timezone_name)
+        except (ZoneInfoNotFoundError, ValueError):
+            log.warning("invalid saved timezone; using %s", DEFAULT_TIMEZONE)
+            timezone_name = DEFAULT_TIMEZONE
+            local_zone = ZoneInfo(DEFAULT_TIMEZONE)
+        now = self.clock()
+        local_now = now.replace(tzinfo=local_zone) if now.tzinfo is None else now.astimezone(local_zone)
+        request_for_model = request
+        home_address = (profile or {}).get("home_address")
+        if home_address:
+            request_for_model = re.sub(re.escape(home_address), "[private address]", request_for_model,
+                                       flags=re.IGNORECASE)
+
+        try:
+            intent = await asyncio.wait_for(
+                extract_travel_intent(self.model, request_for_model, local_now, timezone_name),
+                timeout=chat_timeout_s() + 1,
+            )
+        except asyncio.TimeoutError:
+            return CommutePlanResponse(
+                status="error",
+                description="I couldn't interpret that commute request in time. Please try again with a date, direction, and time.",
+            )
+        except IntentExtractionError:
+            log.warning("commute intent model returned invalid output")
+            return CommutePlanResponse(
+                status="clarification",
+                description="I couldn't confidently understand that request. Please rephrase it with where and when you want to travel.",
+            )
+        except Exception as error:
+            log.warning("commute intent extraction failed: %s", type(error).__name__)
+            return CommutePlanResponse(
+                status="error",
+                description="I couldn't interpret that commute request right now. Please try again in a minute.",
+            )
+
+        if intent.needs_clarification:
+            return CommutePlanResponse(
+                status="clarification",
+                description=intent.clarification_question or "Should I plan a trip to campus or home?",
+            )
+
+        if intent.travel_date is not None and intent.travel_date < local_now.date():
+            return CommutePlanResponse(
+                status="clarification",
+                description=f"That date has already passed. {intent.travel_date.strftime('%A, %B')} {intent.travel_date.day} is in the past. Which upcoming date should I use?",
+            )
+        constraint = intent.time_constraint
+        if (intent.travel_date == local_now.date() and constraint is not None
+                and constraint.type in ("arrive_by", "leave_at") and constraint.time is not None):
+            requested_at = datetime.combine(intent.travel_date, datetime.strptime(constraint.time, "%H:%M").time(),
+                                            tzinfo=local_zone)
+            if requested_at < local_now:
+                return CommutePlanResponse(
+                    status="clarification",
+                    description="That time has already passed today. Which upcoming date should I use?",
+                )
+        if not profile or not profile.get("home_address"):
+            return CommutePlanResponse(
+                status="error",
+                description="I don't have a saved home address for your private commute profile yet. Add it privately before planning a trip to or from campus.",
+            )
+
+        try:
+            schedule = await dbcall.call(
+                self.db, "get_student_schedule", discord_guild_id or "dm", discord_user_id
+            )
+        except Exception as error:
+            log.warning("commute schedule lookup failed: %s", type(error).__name__)
+            return CommutePlanResponse(
+                status="error",
+                description="I couldn't access your saved class schedule right now. Please try again in a minute.",
+            )
+        try:
+            buffer_minutes = arrival_buffer_minutes()
+        except ValueError as error:
+            log.warning("commute arrival-buffer configuration is invalid: %s", type(error).__name__)
+            return CommutePlanResponse(
+                status="error",
+                description="I couldn't prepare a commute plan because the arrival-buffer configuration is invalid.",
+            )
+        try:
+            plan = plan_from_schedule(
+                intent, schedule, request, local_now, buffer_minutes,
+                campus_name=(profile or {}).get("campus"),
+            )
+        except Exception as error:
+            log.warning("commute schedule planning failed: %s", type(error).__name__)
+            return CommutePlanResponse(
+                status="error",
+                description="I couldn't prepare a commute plan right now. Please try again in a minute.",
+            )
+
+        if plan.needs_clarification:
+            return self._commute_response(
+                "clarification", plan.clarification_question or "What time should I plan around?", plan
+            )
+        summary = self._commute_schedule_summary(intent, plan)
+        if plan.travel_date is None:
+            return CommutePlanResponse(status="clarification", description=summary)
+        if plan.direction != "to_campus":
+            return self._commute_response(
+                "unsupported",
+                f"{summary} The current trip planner only estimates trips from your saved home to campus; it can't estimate the return trip yet.",
+                plan,
+            )
+        if not plan.time_constraint or plan.time_constraint.type != "arrive_by" \
+                or not plan.time_constraint.time:
+            return self._commute_response(
+                "unsupported",
+                f"{summary} The current trip planner requires an arrival deadline, so I can't estimate a departure-time request yet.",
+                plan,
+            )
+
+        arrive_by = datetime.combine(
+            plan.travel_date,
+            datetime.strptime(plan.time_constraint.time, "%H:%M").time(),
+            tzinfo=local_zone,
+        )
+        mode = planner_mode((profile or {}).get("preferred_transport_modes"))
+        try:
+            estimate = await self.travel.minutes(
+                profile["home_address"], plan.destination_building, mode, arrive_by
+            )
+        except Exception as error:
+            log.warning("commute travel-time lookup failed: %s", type(error).__name__)
+            estimate = None
+        if estimate is None:
+            return self._commute_response(
+                "error",
+                f"{summary} I couldn't get a usable travel-time estimate right now, so I can't recommend a departure time.",
+                plan,
+                target_arrival=display(plan.time_constraint.time),
+            )
+
+        recommended_departure = arrive_by - timedelta(minutes=estimate.minutes)
+        mode_label = MODE_WORDS.get(estimate.mode, estimate.mode.lower())
+        course_name = plan.relevant_course_name
+        description = "Transit conditions may affect your trip. Duration and departure time are estimates."
+        if recommended_departure < local_now:
+            description = "The estimated departure time has already passed. I can't confirm that you can make the arrival target."
+        return CommutePlanResponse(
+            status="success",
+            description=description,
+            course_name=course_name,
+            course_code=plan.relevant_course,
+            class_start_time=display(plan.class_start_time) if plan.class_start_time else None,
+            campus_building=plan.destination_building or estimate.destination,
+            travel_date=plan.travel_date.isoformat(),
+            direction=plan.direction,
+            campus_destination=plan.campus_name or (profile or {}).get("campus"),
+            target_arrival_time=display(plan.time_constraint.time),
+            estimated_duration_minutes=estimate.minutes,
+            recommended_departure_time=display(recommended_departure.strftime("%H:%M")),
+            transport_mode=mode_label,
+            estimated=True,
+        )
+
+    @staticmethod
+    def _commute_response(
+        status: str,
+        description: str,
+        plan: ScheduleAwarePlan,
+        target_arrival: str | None = None,
+    ) -> CommutePlanResponse:
+        return CommutePlanResponse(
+            status=status,
+            description=description,
+            course_name=plan.relevant_course_name,
+            course_code=plan.relevant_course,
+            class_start_time=display(plan.class_start_time) if plan.class_start_time else None,
+            campus_building=plan.destination_building,
+            travel_date=plan.travel_date.isoformat() if plan.travel_date else None,
+            direction=plan.direction,
+            campus_destination=plan.campus_name,
+            target_arrival_time=target_arrival,
+        )
+
+    @staticmethod
+    def _commute_schedule_summary(intent: TravelIntent, plan: ScheduleAwarePlan) -> str:
+        if plan.travel_date is None:
+            return "What date should I plan for?"
+        date_text = f"{plan.travel_date.strftime('%A')}, {plan.travel_date.strftime('%B')} {plan.travel_date.day}"
+        constraint = plan.time_constraint
+        if plan.relevant_course and plan.direction == "to_campus":
+            inferred = intent.time_constraint and intent.time_constraint.type == "inferred_from_schedule"
+            label = "first class" if intent.destination == "first_class" or inferred else "class"
+            class_description = plan.relevant_course
+            if plan.class_start_time:
+                class_description += f" at {display(plan.class_start_time)}"
+            if plan.destination_building:
+                class_description += f" in {plan.destination_building}"
+            text = f"📚 Your {label} on {date_text} is {class_description}."
+            if constraint and constraint.time:
+                text += f" The arrival target is {display(constraint.time)}."
+            return text
+        if plan.relevant_course and plan.direction == "from_campus":
+            inferred = intent.time_constraint and intent.time_constraint.type == "inferred_from_schedule"
+            label = "last class" if intent.destination == "last_class" or inferred else "class"
+            class_description = plan.relevant_course
+            if plan.class_end_time:
+                class_description += f", ending at {display(plan.class_end_time)}"
+            timing = f" after {display(constraint.time)}" if constraint and constraint.time else ""
+            return (f"📚 Your {label} on {date_text} is {class_description}. "
+                    f"I'll plan a trip home{timing}.")
+        summary = AgentService._commute_intent_summary(intent)
+        return f"I understood: {summary}."
+
+    @staticmethod
+    def _commute_intent_summary(intent: TravelIntent) -> str:
+        travel_date = intent.travel_date
+        direction = "to campus" if intent.direction == "to_campus" else "home"
+        when = (f"{travel_date.strftime('%A, %B')} {travel_date.day}" if travel_date else "the requested date")
+        constraint = intent.time_constraint
+        if constraint is None or constraint.type == "inferred_from_schedule":
+            timing = "timed around your class schedule"
+        else:
+            time = constraint.time
+            clock_time = display(time) if time else "the requested time"
+            label = {"arrive_by": "arriving by", "leave_at": "leaving at", "leave_after": "leaving after"}[
+                constraint.type
+            ]
+            timing = f"{label} {clock_time}"
+        destination = {
+            "first_class": "your first class",
+            "last_class": "your last class",
+            "home": "home",
+            "campus": "campus",
+        }.get(intent.destination or "", intent.destination)
+        target = f" at {destination}" if destination else ""
+        return f"travel {direction} on {when}, {timing}{target}"
 
     # Commute setup form: home address (required, private), area, usual departure time, transport, matching opt-in.
 
