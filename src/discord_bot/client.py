@@ -8,7 +8,7 @@ from discord.ext import commands
 
 from src.config import settings
 from src.discord_bot.commands.commute import build_commute_group
-from src.discord_bot.commands.schedule import build_schedule_group
+from src.discord_bot.commands.schedule import ConfirmScheduleView, build_schedule_group
 from src.shared.contracts import ProcessMessageContext
 from src.utils.logger import log
 
@@ -59,7 +59,13 @@ def create_discord_client(
 				channel_id=str(interaction.channel_id),
 				mentioned_user_ids=_USER_MENTION.findall(question),
 			))
-			await interaction.followup.send(response.response_text, ephemeral=True)
+			user_id = str(interaction.user.id)
+			pending = bot.agent.pending_schedule(user_id) if "pending_schedule" in (response.metadata or {}) else None
+			if pending:  # a typed schedule: same Confirm / Cancel as /schedule upload, or it can never be saved
+				view = ConfirmScheduleView(bot.agent, user_id, str(interaction.guild_id or "dm"), pending)
+				await interaction.followup.send(response.response_text, view=view, ephemeral=True)
+			else:
+				await interaction.followup.send(response.response_text, ephemeral=True)
 		except Exception as error:
 			log(f"Discord /ask failed: {error}")  # log is a plain function, not a logging.Logger
 			await interaction.followup.send(

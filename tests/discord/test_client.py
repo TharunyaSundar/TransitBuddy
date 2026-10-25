@@ -86,3 +86,54 @@ def test_ask_failure_still_answers():
 
     # before the fix, the error handler itself crashed and Discord stayed on "thinking"
     assert "unavailable right now" in interaction.followup.content
+
+
+def test_ask_shows_confirm_for_a_typed_schedule():
+    class FakeAgentService:
+        def __init__(self):
+            self.pending = {"123": {"semester": "Fall 2026", "courses": [{"course_code": "CSE 110"}]}}
+            self.saved = None
+
+        async def process_message(self, context):
+            return AgentResponse(response_text="Here's your schedule. Press Confirm to save it.",
+                                 metadata={"pending_schedule": {"confirmation_required": True}})
+
+        def pending_schedule(self, user_id):
+            return self.pending.get(user_id)
+
+        def discard_pending_schedule(self, user_id):
+            self.pending.pop(user_id, None)
+
+        async def save_confirmed_schedule(self, user_id, guild_id, schedule=None):
+            self.saved = (user_id, guild_id, schedule)
+
+    class FakeResponse:
+        async def defer(self, **kwargs):
+            pass
+
+        async def edit_message(self, **kwargs):
+            self.edited = kwargs
+
+    class FakeFollowup:
+        async def send(self, content, **kwargs):
+            self.content, self.kwargs = content, kwargs
+
+    agent = FakeAgentService()
+    interaction = type("Interaction", (), {})()
+    interaction.user = type("User", (), {"id": 123})()
+    interaction.guild_id = 456
+    interaction.channel_id = 789
+    interaction.response = FakeResponse()
+    interaction.followup = FakeFollowup()
+    command = create_discord_client(agent_service=agent).tree.get_command("ask")
+
+    asyncio.run(command.callback(interaction, "My classes: CSE 110 MWF 9:00-9:50 AM ISTB4 101"))
+
+    view = interaction.followup.kwargs["view"]
+    assert [c.label for c in view.children] == ["Confirm", "Cancel"]
+    assert interaction.followup.kwargs["ephemeral"] is True
+    press = type("Interaction", (), {})()
+    press.user = interaction.user
+    press.response = FakeResponse()
+    asyncio.run(view.children[0].callback(press))  # Confirm
+    assert agent.saved == ("123", "456", agent.pending["123"])
