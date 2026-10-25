@@ -1,6 +1,5 @@
 """Discord client and guild slash-command registration."""
 
-import asyncio
 import re
 
 import discord
@@ -8,6 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from src.config import settings
+from src.discord_bot.commands.schedule import build_schedule_group
 from src.shared.contracts import ProcessMessageContext
 from src.utils.logger import log
 
@@ -20,19 +20,8 @@ def create_discord_client(
 	intents = discord.Intents.default()
 	intents.guild_messages = True
 	bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents)
-	agent_lock = asyncio.Lock()
-
-	async def get_agent_service():
-		nonlocal agent_service
-		if agent_service is None:
-			async with agent_lock:
-				if agent_service is None:
-					from src.agent import AgentService
-					from src.database import DatabaseService, connect_database
-
-					await connect_database()
-					agent_service = AgentService(DatabaseService())
-		return agent_service
+	bot.agent = agent_service
+	bot.tree.add_command(build_schedule_group(lambda: bot.agent))
 
 	@bot.tree.command(name="ping", description="Check whether Transit Buddy is online.")
 	async def ping(interaction: discord.Interaction) -> None:
@@ -40,9 +29,11 @@ def create_discord_client(
 
 	@bot.tree.command(name="status", description="Show the current Transit Buddy bot status.")
 	async def status(interaction: discord.Interaction) -> None:
-		await interaction.response.send_message(
-			"Transit Buddy is online. Use /ask to ask about schedules and commutes."
-		)
+		if bot.agent is None:
+			text = "Transit Buddy is online, but schedule and assistant features are unavailable."
+		else:
+			text = "Transit Buddy is online. Use /ask for commute questions or /schedule for your schedule."
+		await interaction.response.send_message(text)
 
 	@bot.tree.command(name="ask", description="Ask Transit Buddy about schedules and commutes.")
 	@app_commands.describe(question="Ask about your schedule, availability, or commute options.")
@@ -53,8 +44,13 @@ def create_discord_client(
 
 		await interaction.response.defer(ephemeral=True, thinking=True)
 		try:
-			service = await get_agent_service()
-			response = await service.process_message(ProcessMessageContext(
+			if bot.agent is None:
+				await interaction.followup.send(
+					"Transit Buddy's assistant is unavailable because its database isn't connected.",
+					ephemeral=True,
+				)
+				return
+			response = await bot.agent.process_message(ProcessMessageContext(
 				message=question.strip(),
 				discord_user_id=str(interaction.user.id),
 				discord_guild_id=str(interaction.guild_id or "dm"),
@@ -79,7 +75,28 @@ def create_discord_client(
 		await bot.tree.sync(guild=guild)
 		log("Discord slash commands registered successfully.")
 
-	bot.setup_hook = sync_guild_commands
+	async def setup_agent() -> None:
+		if bot.agent is not None:
+			return
+		if not settings.mongodb_uri:
+			log("MONGODB_URI missing; schedule commands will report that they are unavailable.")
+			return
+		try:
+			from src.agent import AgentService
+			from src.database import DatabaseService, connect_database
+
+			await connect_database()
+			bot.agent = AgentService(DatabaseService())
+			log("Agent connected to MongoDB.")
+		except Exception as error:
+			log(f"Agent setup failed: {error}")
+
+	async def setup_hook() -> None:
+		if not register_commands_only:
+			await setup_agent()
+		await sync_guild_commands()
+
+	bot.setup_hook = setup_hook
 
 	@bot.event
 	async def on_ready() -> None:

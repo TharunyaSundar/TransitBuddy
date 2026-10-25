@@ -40,9 +40,11 @@ text = agent.format_schedule(result.extracted_schedule)  # short list to show wi
 # Confirm button (the ONLY path that saves a schedule). Not in docs/integration-contracts.md yet.
 await agent.save_confirmed_schedule(user_id, guild_id)            # or pass an edited schedule as 3rd arg
 agent.discard_pending_schedule(user_id)                           # Edit / Cancel button
+text = await agent.view_schedule(user_id, guild_id)              # saved + pending schedule, for /schedule view
 ```
 
-The agent never sends Discord messages and never saves an unconfirmed schedule.
+The agent never sends Discord messages and never saves an unconfirmed schedule. `/schedule upload` and
+`/schedule view` (`src/discord_bot/commands/schedule.py`) are a working example of these calls.
 
 ## Wiring with Developer 2's database
 
