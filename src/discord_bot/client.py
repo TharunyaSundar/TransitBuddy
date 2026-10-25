@@ -1,16 +1,38 @@
 """Discord client and guild slash-command registration."""
 
+import asyncio
+import re
+
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from src.config import settings
+from src.shared.contracts import ProcessMessageContext
 from src.utils.logger import log
 
+_USER_MENTION = re.compile(r"<@!?(\d+)>")
 
-def create_discord_client(*, register_commands_only: bool = False) -> commands.Bot:
+
+def create_discord_client(
+	*, register_commands_only: bool = False, agent_service=None
+) -> commands.Bot:
 	intents = discord.Intents.default()
 	intents.guild_messages = True
 	bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents)
+	agent_lock = asyncio.Lock()
+
+	async def get_agent_service():
+		nonlocal agent_service
+		if agent_service is None:
+			async with agent_lock:
+				if agent_service is None:
+					from src.agent import AgentService
+					from src.database import DatabaseService, connect_database
+
+					await connect_database()
+					agent_service = AgentService(DatabaseService())
+		return agent_service
 
 	@bot.tree.command(name="ping", description="Check whether Transit Buddy is online.")
 	async def ping(interaction: discord.Interaction) -> None:
@@ -19,8 +41,33 @@ def create_discord_client(*, register_commands_only: bool = False) -> commands.B
 	@bot.tree.command(name="status", description="Show the current Transit Buddy bot status.")
 	async def status(interaction: discord.Interaction) -> None:
 		await interaction.response.send_message(
-			"Transit Buddy is online. Schedule and commute features are not connected yet."
+			"Transit Buddy is online. Use /ask to ask about schedules and commutes."
 		)
+
+	@bot.tree.command(name="ask", description="Ask Transit Buddy about schedules and commutes.")
+	@app_commands.describe(question="Ask about your schedule, availability, or commute options.")
+	async def ask(interaction: discord.Interaction, question: str) -> None:
+		if not question.strip():
+			await interaction.response.send_message("Enter a question for Transit Buddy.", ephemeral=True)
+			return
+
+		await interaction.response.defer(ephemeral=True, thinking=True)
+		try:
+			service = await get_agent_service()
+			response = await service.process_message(ProcessMessageContext(
+				message=question.strip(),
+				discord_user_id=str(interaction.user.id),
+				discord_guild_id=str(interaction.guild_id or "dm"),
+				channel_id=str(interaction.channel_id),
+				mentioned_user_ids=_USER_MENTION.findall(question),
+			))
+			await interaction.followup.send(response.response_text, ephemeral=True)
+		except Exception:
+			log.exception("Discord /ask failed")
+			await interaction.followup.send(
+				"Transit Buddy's assistant is unavailable right now. Please try again later.",
+				ephemeral=True,
+			)
 
 	async def sync_guild_commands() -> None:
 		if not settings.discord_guild_id:
@@ -69,6 +116,10 @@ async def start_discord_client() -> commands.Bot | None:
 		log(f"Discord client failed: {error}")
 		await bot.close()
 		return None
+	finally:
+		from src.database import disconnect_database
+
+		await disconnect_database()
 	return bot
 
 
