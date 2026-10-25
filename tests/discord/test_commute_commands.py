@@ -61,10 +61,9 @@ def reply(inter) -> dict:
     return inter.followup.sent[0]
 
 
-def test_bot_registers_only_commute_plan():
-    # the commute group here (availability, match, setup, ...) stays unregistered; only /commute plan is live
+def test_bot_does_not_register_commute_slash_group():
     bot = create_discord_client()
-    assert [c.name for c in bot.tree.get_command("commute").commands] == ["plan"]
+    assert bot.tree.get_command("commute") is None
 
 
 def test_availability_is_private_and_skips_bots_and_self():

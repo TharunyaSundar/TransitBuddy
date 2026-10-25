@@ -49,25 +49,9 @@ text = await agent.commute_plan(user_id, guild_id, classmate_ids, "today", "to_c
 ```
 
 The agent never sends Discord messages and never saves an unconfirmed schedule. The available slash commands
-are `/ask`, `/schedule upload`, `/schedule view` and `/commute plan`; the schedule commands are in
-`src/discord_bot/commands/schedule.py` and `/commute plan` in `src/discord_bot/commands/plan.py`. The other
-commute methods above are available to application code but are not registered as slash commands.
-
-## /commute plan
-
-`text = await agent.plan_commute(user_id, guild_id, request)` (`commute_plan.py`, `route.py`):
-1. The model turns the free-text request into a few fields (class, day, starting place, another destination,
-   arrival time). It sees the request and the class list, never the home address.
-2. Plain code picks the trip from the saved, confirmed timetable: that class's next meeting (arriving 10 minutes
-   early), or a named destination and time. Buildings come from the verified ASU list; an unknown building
-   plans to the Memorial Union and the reply says so.
-3. The trip planner (`NEVER_LATE_TOKEN`) returns real bus, walk and bike journeys from the student's saved home
-   address (or the place they named). Journeys whose first bus can't be caught, or that need a walk over 20
-   minutes to or from a stop, are dropped. The primary is the on-time bus trip with the fewest transfers, then
-   the latest departure; the backup boards later and still arrives before class. Every time and stop comes
-   from the planner; the reply says bus times are posted schedules and includes the map link.
-4. Every failure gets a plain reply: no schedule (`/schedule upload`), no home address (the
-   "Set up your commute" button), address not found, planner busy or down, buses already gone.
+are `/ask`, `/schedule upload`, and `/schedule view`; the schedule commands are implemented in
+`src/discord_bot/commands/schedule.py`. Commute methods above are available to application code but are not
+registered as slash commands.
 
 ## Wiring with Developer 2's database
 

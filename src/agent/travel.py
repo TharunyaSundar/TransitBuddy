@@ -59,10 +59,6 @@ def _short_name(name: str) -> str:
     return re.sub(r"\s+(Hall|Building|Center|Centre)$", "", name).strip()
 
 
-def campus_centre() -> dict:
-    return _buildings()[CAMPUS_CENTRE]
-
-
 def find_building(location: str) -> dict | None:
     """'Tempe, ISTB4 101' or 'Tempe - Lattie F. Coor 4403' -> the verified building, or None."""
     text = location or ""
@@ -145,26 +141,6 @@ class TravelService:
         if result is not None:  # cache only real answers: a failure (e.g. HTTP 429, rate limit) is retried next time
             self._cache[key] = result
         return result
-
-    async def plan(self, origin_address: str, origin_label: str, destination: dict, arrive_by: datetime,
-                   modes: list[str], buffer_min: int = 0) -> tuple[int, dict | None]:
-        """Full trip planner answer (journeys, map link, weather) for /commute plan. destination: a building
-        from the verified list ({name, code, address, lat, lng}) or {label, address}. Never raises:
-        (0, None) when the planner can't be reached."""
-        if not self.enabled:
-            return 0, None
-        dest = {"label": destination.get("label") or f"{destination['name']} ({destination['code']})",
-                "address": destination["address"]}
-        if destination.get("lat") is not None:
-            dest.update(lat=destination["lat"], lng=destination["lng"])
-        body = {"origin": {"label": origin_label, "address": origin_address}, "destination": dest,
-                "arrive_by": arrive_by.replace(second=0, microsecond=0).isoformat(), "modes": modes,
-                "buffer_min": buffer_min}
-        try:
-            return await self._call(body)
-        except Exception as error:
-            log.warning("trip planner call failed: %s", type(error).__name__)
-            return 0, None
 
     async def check_address(self, address: str, now: datetime) -> str:
         """'ok', 'not_found' (the planner can't locate it), 'too_far' (Google matched it to a place more than
