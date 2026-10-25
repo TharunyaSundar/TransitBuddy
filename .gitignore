@@ -1,7 +1,14 @@
-node_modules/
 .env
 .env.*
 !.env.example
-npm-debug.log*
-.DS_Store
+node_modules/
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 coverage/
+.DS_Store
+npm-debug.log*
