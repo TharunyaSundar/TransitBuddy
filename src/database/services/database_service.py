@@ -1,8 +1,7 @@
 """DatabaseService implementation of docs/integration-contracts.md."""
-from ...shared.contracts import CommutePreferences, RideRequest, Student, StudentSchedule
+from ...shared.contracts import Student, StudentSchedule
 from ...shared.validators import is_valid_course
 from .. import repositories as repos
-from ..repositories import ride_requests
 
 
 def _validate_schedule(schedule: StudentSchedule) -> None:
@@ -36,24 +35,3 @@ class DatabaseService:
 
     async def delete_student_schedule(self, discord_guild_id: str, discord_user_id: str) -> bool:
         return await repos.schedules.delete(discord_guild_id, discord_user_id)
-
-    async def save_commute_preferences(self, preferences: CommutePreferences) -> CommutePreferences:
-        return await repos.commute_preferences.upsert(preferences)
-
-    async def get_commute_preferences(
-        self, discord_guild_id: str, discord_user_id: str
-    ) -> CommutePreferences | None:
-        return await repos.commute_preferences.find(discord_guild_id, discord_user_id)
-
-    async def get_opted_in_commute_preferences(self, discord_guild_id: str) -> list[CommutePreferences]:
-        """Everyone in the guild who opted in to ride-sharing matching (uses the guild_optin index)."""
-        return await repos.commute_preferences.find_where(discord_guild_id, ride_sharing_opt_in=True)
-
-    async def create_ride_request(self, request: RideRequest) -> RideRequest:
-        return await ride_requests.create(request)
-
-    async def get_open_ride_requests(self, discord_guild_id: str) -> list[RideRequest]:
-        return await ride_requests.find_open(discord_guild_id)
-
-    async def update_ride_request_status(self, request_id: str, status: str) -> RideRequest | None:
-        return await ride_requests.update_status(request_id, status)

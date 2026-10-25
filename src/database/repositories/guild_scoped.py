@@ -20,7 +20,7 @@ class GuildScopedRepository(Generic[M]):
 
     async def upsert(self, item: M) -> M:
         require(discord_guild_id=item.discord_guild_id, discord_user_id=item.discord_user_id)
-        data = item.model_dump()
+        data = item.model_dump(exclude_unset=True)
         now = now_iso()
         data["updated_at"] = now
 

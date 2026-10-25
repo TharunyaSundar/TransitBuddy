@@ -5,10 +5,8 @@ from src.config import settings
 from src.database import DatabaseService, connect_database, disconnect_database
 from src.shared.constants import DEFAULT_CAMPUS, DEFAULT_TIMEZONE, DEFAULT_UNIVERSITY
 from src.shared.contracts import (
-    CommutePreferences,
     Course,
     MeetingPattern,
-    RideRequest,
     Student,
     StudentSchedule,
 )
@@ -30,18 +28,18 @@ def course(code, name, section, days, start, end, location) -> Course:
 
 # Fictional students only. Ids are fake snowflakes.
 DEMO_STUDENTS = [
-    ("900000000000000001", "Maya Patel", "Tempe Village", ["carpool", "rideshare"], "08:15-08:45", True, [
+    ("900000000000000001", "Maya Patel", "1000 E Apache Blvd, Tempe, AZ", [
         course("CSE 565", "Software Verification", "12345", MW, "09:00", "10:15", "BYENG 210"),
         course("CSE 572", "Data Mining", "23456", MW, "13:30", "14:45", "GWC 487"),
     ]),
-    ("900000000000000002", "Jordan Lee", "Tempe Village", ["rideshare", "bus"], "08:00-08:30", True, [
+    ("900000000000000002", "Jordan Lee", "1010 E Apache Blvd, Tempe, AZ", [
         course("CSE 551", "Algorithms", "34567", MW, "09:00", "10:15", "BYENG 220"),
         course("EEE 598", "Embedded Systems", "45678", TTH, "10:30", "11:45", "GWC 101"),
     ]),
-    ("900000000000000003", "Sam Rivera", "Downtown Phoenix", ["bus"], "07:45-08:15", False, [
+    ("900000000000000003", "Sam Rivera", "500 N Central Ave, Phoenix, AZ", [
         course("CSE 578", "Data Visualization", "56789", TTH, "09:00", "10:15", "SCOB 120"),
     ]),
-    ("900000000000000004", "Priya Natarajan", "Mesa", ["carpool"], "09:00-09:30", True, [
+    ("900000000000000004", "Priya Natarajan", "200 W Main St, Mesa, AZ", [
         course("CSE 475", "Computer Security", "67890", MW, "10:30", "11:45", "BYENG 105"),
     ]),
 ]
@@ -51,27 +49,16 @@ async def seed() -> None:
     await connect_database()
     db = DatabaseService()
 
-    for user_id, name, origin, modes, window, opt_in, courses in DEMO_STUDENTS:
+    for user_id, name, home_address, courses in DEMO_STUDENTS:
         await db.upsert_student(Student(
             discord_user_id=user_id, discord_guild_id=GUILD_ID, display_name=name,
             university=DEFAULT_UNIVERSITY, campus=DEFAULT_CAMPUS, timezone=DEFAULT_TIMEZONE,
-            created_at="", updated_at="",
+            created_at="", updated_at="", home_address=home_address,
         ))
         await db.save_schedule(StudentSchedule(
             discord_user_id=user_id, discord_guild_id=GUILD_ID, semester="Fall 2026",
             courses=courses, confirmation_status="confirmed", updated_at="",
         ))
-        await db.save_commute_preferences(CommutePreferences(
-            discord_user_id=user_id, discord_guild_id=GUILD_ID, general_origin_area=origin,
-            general_destination_area="ASU Tempe campus", preferred_transport_modes=modes,
-            usual_departure_window=window, ride_sharing_opt_in=opt_in,
-        ))
-
-    await db.create_ride_request(RideRequest(
-        request_id="", discord_user_id=DEMO_STUDENTS[0][0], discord_guild_id=GUILD_ID,
-        origin_area="Tempe Village", destination_area="ASU Tempe campus",
-        desired_departure_time="08:30", status="open", created_at="",
-    ))
     print(f"Seeded {len(DEMO_STUDENTS)} demo students in guild {GUILD_ID}.")
 
 

@@ -5,7 +5,7 @@ agent layers. Timestamps are ISO-8601 strings.
 """
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 COURSE_WEEKDAYS = (
     "Monday",
@@ -35,6 +35,16 @@ class Student(BaseModel):
     timezone: str  # IANA name, e.g. America/Phoenix
     created_at: str
     updated_at: str
+    # Required and private: never show it to other students.
+    home_address: str
+
+    @field_validator("home_address")
+    @classmethod
+    def _home_address_not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("home_address is required.")
+        return value
 
 
 class MeetingPattern(BaseModel):

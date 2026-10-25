@@ -4,9 +4,9 @@ This document defines the service boundaries for the project. These interfaces a
 
 ## DatabaseService
 
-The DatabaseService contract is owned by the MongoDB developer and consumed by the agent developer. The service must manage student, schedule, commute, and ride request data scoped to a Discord guild.
+The DatabaseService contract is owned by the MongoDB developer and consumed by the agent developer. The service must manage student and schedule data scoped to a Discord guild.
 
-Models: `Student`, `StudentSchedule` (`courses` -> `meeting_patterns`, `confirmation_status` is `pending_confirmation` or `confirmed`), `CommutePreferences`, `RideRequest` (`status` is `open`, `matched`, `cancelled`, or `completed`). See `contracts.py` for every field.
+Collections: `students` and `schedules` only. Models: `Student` (includes the **required**, private `home_address`; a blank or missing value is rejected), `StudentSchedule` (`courses` -> `meeting_patterns`, `confirmation_status` is `pending_confirmation` or `confirmed`). See `contracts.py` for every field.
 
 ### Required methods
 
@@ -31,20 +31,7 @@ class DatabaseService(Protocol):
 
     async def delete_student_schedule(self, discord_guild_id: str, discord_user_id: str) -> bool: ...
 
-    async def save_commute_preferences(self, preferences: CommutePreferences) -> CommutePreferences: ...
 
-    async def get_commute_preferences(
-        self, discord_guild_id: str, discord_user_id: str
-    ) -> CommutePreferences | None: ...
-
-    async def create_ride_request(self, request: RideRequest) -> RideRequest: ...
-
-    async def get_open_ride_requests(self, discord_guild_id: str) -> list[RideRequest]:
-        """Return all active ride requests in a guild."""
-
-    async def update_ride_request_status(
-        self, request_id: str, status: RideRequestStatus
-    ) -> RideRequest | None: ...
 ```
 
 ### Error behavior

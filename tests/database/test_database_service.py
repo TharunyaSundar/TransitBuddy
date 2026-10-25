@@ -5,7 +5,7 @@ import pytest
 
 from src.database import DatabaseService, connect_database, disconnect_database, get_database
 from src.shared.contracts import (
-    CommutePreferences, Course, MeetingPattern, RideRequest, Student, StudentSchedule,
+    Course, MeetingPattern, Student, StudentSchedule,
 )
 
 db = DatabaseService()
@@ -17,9 +17,10 @@ def run(coro):
     return asyncio.run(coro)
 
 
-def student(g="g", u="u", name="A"):
+def student(g="g", u="u", name="A", address="123 Example St, Mesa, AZ"):
     return Student(discord_user_id=u, discord_guild_id=g, display_name=name, university="ASU",
-                   campus="Tempe", timezone="America/Phoenix", created_at="", updated_at="")
+                   campus="Tempe", timezone="America/Phoenix", created_at="", updated_at="",
+                   home_address=address)
 
 
 def schedule(g="g", u="u", status="confirmed", start="09:00"):
@@ -31,30 +32,28 @@ def schedule(g="g", u="u", status="confirmed", start="09:00"):
     )
 
 
-def ride(g="g", u="u"):
-    return RideRequest(request_id="", discord_user_id=u, discord_guild_id=g, origin_area="a",
-                       destination_area="b", desired_departure_time="08:30", status="open", created_at="")
-
-
 # --- no database needed ---
 
 def test_missing_identifiers_rejected():
     with pytest.raises(ValueError):
         run(db.get_student("", "u"))
     with pytest.raises(ValueError):
-        run(db.get_open_ride_requests(""))
-    with pytest.raises(ValueError):
         run(db.upsert_student(student(g="")))
+
+
+def test_home_address_is_mandatory():
+    with pytest.raises(ValueError):
+        student(address="")
+    with pytest.raises(ValueError):
+        student(address="   ")
+    with pytest.raises(ValueError):
+        Student(discord_user_id="u", discord_guild_id="g", display_name="A", university="ASU",
+                campus="Tempe", timezone="America/Phoenix", created_at="", updated_at="")
 
 
 def test_bad_time_rejected_before_write():
     with pytest.raises(ValueError):
         run(db.save_schedule(schedule(start="9am")))
-
-
-def test_bad_ride_status_rejected():
-    with pytest.raises(ValueError):
-        run(db.update_ride_request_status("id", "bogus"))
 
 
 # --- integration (real MongoDB) ---
@@ -100,45 +99,21 @@ def test_schedules_never_cross_guilds():
 
 
 @needs_db
-def test_commute_preferences_round_trip():
+def test_home_address_saved_trimmed_and_updated():
     async def t():
-        p = CommutePreferences(discord_user_id="u", discord_guild_id="g", general_origin_area="a",
-                               general_destination_area="b", preferred_transport_modes=["bus"],
-                               usual_departure_window="08:00-09:00", ride_sharing_opt_in=True)
-        await db.save_commute_preferences(p)
-        got = await db.get_commute_preferences("g", "u")
-        assert got.ride_sharing_opt_in and got.preferred_transport_modes == ["bus"]
-        assert await db.get_commute_preferences("g", "nobody") is None
+        await db.upsert_student(student(address="  1 Main St, Tempe, AZ "))
+        assert (await db.get_student("g", "u")).home_address == "1 Main St, Tempe, AZ"
+        await db.upsert_student(student(address="2 Oak Ave, Mesa, AZ"))
+        assert (await db.get_student("g", "u")).home_address == "2 Oak Ave, Mesa, AZ"
+        assert await get_database()["students"].count_documents({}) == 1
     in_db(t)
 
 
 @needs_db
-def test_ride_request_lifecycle():
+def test_only_students_and_schedules_collections_exist():
     async def t():
-        r = await db.create_ride_request(ride())
-        assert r.request_id and r.status == "open"
-        assert len(await db.get_open_ride_requests("g")) == 1
-        assert await db.get_open_ride_requests("other") == []
-        assert (await db.update_ride_request_status(r.request_id, "matched")).status == "matched"
-        assert await db.get_open_ride_requests("g") == []
-        assert await db.update_ride_request_status("missing", "open") is None
-    in_db(t)
-
-
-@needs_db
-def test_opted_in_preferences_and_private_home_address():
-    async def t():
-        def prefs(g, u, opt_in, address=None):
-            return CommutePreferences(discord_user_id=u, discord_guild_id=g, general_origin_area="Mesa",
-                                      general_destination_area="ASU Tempe campus", preferred_transport_modes=[],
-                                      usual_departure_window="", ride_sharing_opt_in=opt_in, home_address=address)
-        await db.save_commute_preferences(prefs("g", "a", True, "123 Example St, Mesa, AZ"))
-        await db.save_commute_preferences(prefs("g", "b", False))
-        await db.save_commute_preferences(prefs("other", "c", True))
-        opted = await db.get_opted_in_commute_preferences("g")
-        assert [p.discord_user_id for p in opted] == ["a"]  # not b (opted out), not c (other guild)
-        assert (await db.get_commute_preferences("g", "a")).home_address == "123 Example St, Mesa, AZ"
-        assert (await db.get_commute_preferences("g", "b")).home_address is None
-        await db.save_commute_preferences(prefs("g", "a", True, None))  # forget the address
-        assert (await db.get_commute_preferences("g", "a")).home_address is None
+        await db.upsert_student(student())
+        await db.save_schedule(schedule())
+        names = set(await get_database().list_collection_names())
+        assert names == {"students", "schedules"}
     in_db(t)
