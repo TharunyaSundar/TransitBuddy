@@ -1,7 +1,11 @@
 # Deployment (Terraform + GitHub Actions)
 
-One `t3.micro` Ubuntu instance runs the bot under systemd. Nothing deploys on push: run the
-**Infrastructure** workflow from the Actions tab and choose `plan`, `apply` or `destroy`.
+One `t3.micro` Ubuntu instance runs the bot under systemd. Create, preview and destroy the server by running the
+**Infrastructure** workflow from the Actions tab (`plan`, `apply` or `destroy`).
+
+**Auto-update:** a push to `main` that touches `src/`, `requirements.txt` or `infra/` checks whether the server exists.
+If it is up, the server is rebuilt fresh from the pushed commit. If it is destroyed, the push does nothing
+(a push never creates the server; run `apply` manually for that).
 
 ## One-time setup
 1. `./infra/bootstrap.sh` (local admin AWS creds): creates the state bucket and the OIDC deploy role.

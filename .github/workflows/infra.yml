@@ -1,7 +1,16 @@
 name: Infrastructure
 
-# Manual only: nothing deploys on push. Run it from the Actions tab.
+# Manual runs (Actions tab): plan, apply or destroy.
+# Push to main: if the server is up, redeploy it fresh from the pushed commit.
+# If the server is destroyed, a push does nothing (it never creates the server).
 on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "requirements.txt"
+      - "infra/**"
+      - ".github/workflows/infra.yml"
   workflow_dispatch:
     inputs:
       action:
@@ -27,9 +36,38 @@ env:
   TF_INPUT: "false"
 
 jobs:
-  terraform:
-    if: github.ref == 'refs/heads/main'
+  # Push only: is there a server to update?
+  check:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.server.outputs.exists }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: server
+        run: |
+          ids=$(aws ec2 describe-instances \
+            --filters Name=tag:Name,Values=transit-buddy-bot \
+                      Name=instance-state-name,Values=pending,running,stopping,stopped \
+            --query 'Reservations[].Instances[].InstanceId' --output text)
+          if [ -n "$ids" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Server $ids is up: redeploying commit $GITHUB_SHA."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No server is running: nothing to update. Run this workflow manually with apply to create it."
+          fi
+
+  terraform:
+    needs: check
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || needs.check.outputs.exists == 'true') }}
+    runs-on: ubuntu-latest
+    env:
+      ACTION: ${{ inputs.action || 'apply' }} # push => apply
     defaults:
       run:
         working-directory: infra
@@ -58,12 +96,12 @@ jobs:
         run: terraform validate
 
       - name: Terraform plan
-        if: inputs.action == 'plan'
+        if: env.ACTION == 'plan'
         run: terraform plan -var="git_ref=${{ inputs.git_ref || github.sha }}"
 
       # The bot's .env lives in SSM (SecureString), never in Terraform state.
       - name: Store bot .env in SSM
-        if: inputs.action == 'apply'
+        if: env.ACTION == 'apply'
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
@@ -93,13 +131,13 @@ jobs:
           rm -f "$RUNNER_TEMP/bot.env"
 
       - name: Terraform apply
-        if: inputs.action == 'apply'
+        if: env.ACTION == 'apply'
         run: terraform apply -auto-approve -var="git_ref=${{ inputs.git_ref || github.sha }}"
 
       - name: Terraform destroy
-        if: inputs.action == 'destroy'
+        if: env.ACTION == 'destroy'
         run: terraform destroy -auto-approve
 
       - name: Delete bot .env from SSM
-        if: inputs.action == 'destroy'
+        if: env.ACTION == 'destroy'
         run: aws ssm delete-parameter --name /transitbuddy/env || true
